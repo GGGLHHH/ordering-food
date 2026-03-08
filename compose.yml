@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:18.3
+    container_name: ordering-food-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ordering_food
+      POSTGRES_USER: ordering_food
+      POSTGRES_PASSWORD: ordering_food
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ordering_food -d ordering_food"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:8.6.1
+    container_name: ordering-food-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres-data:
+  redis-data:
