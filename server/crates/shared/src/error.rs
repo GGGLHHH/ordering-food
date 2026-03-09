@@ -8,11 +8,13 @@ use std::error::Error as StdError;
 use thiserror::Error;
 use tracing::{error, warn};
 use tracing_error::SpanTrace;
+use ts_rs::TS;
 use utoipa::ToSchema;
 
 type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[ts(export)]
 pub struct ErrorEnvelope {
     pub code: String,
     pub message: String,
@@ -22,12 +24,14 @@ pub struct ErrorEnvelope {
     pub details: Option<ErrorDetails>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[ts(export)]
 pub struct ErrorDetails {
     pub fields: Vec<FieldIssue>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[ts(export)]
 pub struct FieldIssue {
     pub location: FieldLocation,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -36,8 +40,9 @@ pub struct FieldIssue {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum FieldLocation {
     Body,
     Query,

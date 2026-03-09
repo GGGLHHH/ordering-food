@@ -1,5 +1,5 @@
-use ordering_food_shared::error::AppError;
 use async_trait::async_trait;
+use ordering_food_shared::error::AppError;
 use redis::aio::MultiplexedConnection;
 use serde::Serialize;
 use sqlx::PgPool;

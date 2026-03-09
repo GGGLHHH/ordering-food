@@ -1,15 +1,12 @@
 pub mod api;
 pub mod health;
 
-use crate::{
-    app::AppState,
-    readiness::DependencyChecks,
-};
+use crate::{app::AppState, readiness::DependencyChecks};
+use axum::{Router, extract::DefaultBodyLimit};
 use ordering_food_shared::{
     error::{ErrorDetails, ErrorEnvelope, FieldIssue, FieldLocation},
     http::{self, PageMeta},
 };
-use axum::{Router, extract::DefaultBodyLimit};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 

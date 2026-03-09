@@ -1,9 +1,15 @@
 use std::sync::Arc;
 
 use axum::extract::FromRef;
-use axum::{Json, Router, extract::State, routing::{get, post}};
+use axum::{
+    Json, Router,
+    extract::State,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use utoipa::{IntoParams, OpenApi, ToSchema};
+use uuid::Uuid;
 
 use ordering_food_shared::{
     error::{AppError, ErrorEnvelope},
@@ -47,15 +53,17 @@ pub struct UserApiDoc;
 // DTOs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, TS)]
+#[ts(export)]
 pub struct LoginRequest {
     /// Phone number (10-15 digits).
     pub phone: String,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize, ToSchema, TS)]
+#[ts(export)]
 pub struct UserResponse {
-    pub id: i64,
+    pub id: Uuid,
     pub phone: String,
     pub nickname: String,
     pub avatar_url: String,
@@ -80,7 +88,8 @@ impl From<User> for UserResponse {
     }
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, TS)]
+#[ts(export)]
 pub struct UpdateProfileRequest {
     pub nickname: Option<String>,
     pub avatar_url: Option<String>,
@@ -99,7 +108,7 @@ impl From<UpdateProfileRequest> for UpdateUser {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Path)]
 pub struct UserPath {
-    pub user_id: i64,
+    pub user_id: Uuid,
 }
 
 // ---------------------------------------------------------------------------

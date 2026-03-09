@@ -200,10 +200,6 @@ fn build_cors_layer(settings: &Settings) -> Result<CorsLayer> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ordering_food_shared::{
-        config::Settings,
-        error::AppError,
-    };
     use crate::{
         readiness::DependencyChecks,
         routes::{
@@ -211,19 +207,21 @@ mod tests {
             api::{EXAMPLE_ECHO_PATH, EXAMPLE_ITEM_PATH, EXAMPLE_SEARCH_PATH},
         },
     };
-    use ordering_food_user::{
-        domain::{NewUser, Phone, UpdateUser, User},
-        repository::UserRepository,
-        service::UserService,
-    };
     use async_trait::async_trait;
     use axum::{
         body::{Body, to_bytes},
         http::{Method, Request, StatusCode},
     };
+    use ordering_food_shared::{config::Settings, error::AppError};
+    use ordering_food_user::{
+        domain::{NewUser, Phone, UpdateUser, User},
+        repository::UserRepository,
+        service::UserService,
+    };
     use serde_json::Value;
     use std::sync::Mutex;
     use tower::ServiceExt;
+    use uuid::Uuid;
 
     struct MockReadiness {
         result: Mutex<Option<Result<DependencyChecks, AppError>>>,
@@ -244,7 +242,7 @@ mod tests {
 
     #[async_trait]
     impl UserRepository for MockUserRepository {
-        async fn find_by_id(&self, _id: i64) -> Result<Option<User>, AppError> {
+        async fn find_by_id(&self, _id: Uuid) -> Result<Option<User>, AppError> {
             unimplemented!()
         }
         async fn find_by_phone(&self, _phone: &Phone) -> Result<Option<User>, AppError> {
@@ -253,7 +251,7 @@ mod tests {
         async fn create(&self, _new_user: &NewUser) -> Result<User, AppError> {
             unimplemented!()
         }
-        async fn update(&self, _id: i64, _update: &UpdateUser) -> Result<Option<User>, AppError> {
+        async fn update(&self, _id: Uuid, _update: &UpdateUser) -> Result<Option<User>, AppError> {
             unimplemented!()
         }
     }

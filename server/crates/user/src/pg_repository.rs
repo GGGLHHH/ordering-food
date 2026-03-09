@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
+use uuid::Uuid;
 
 use ordering_food_shared::error::AppError;
 
@@ -20,7 +21,7 @@ impl PgUserRepository {
 // Intermediate row struct isolating SQLx types from domain types.
 #[derive(FromRow)]
 struct UserRow {
-    id: i64,
+    id: Uuid,
     phone: String,
     nickname: String,
     avatar_url: String,
@@ -47,7 +48,7 @@ impl UserRow {
 
 #[async_trait]
 impl UserRepository for PgUserRepository {
-    async fn find_by_id(&self, id: i64) -> Result<Option<User>, AppError> {
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, AppError> {
         let row = sqlx::query_as::<_, UserRow>(
             "SELECT id, phone, nickname, avatar_url, role, status, created_at, updated_at \
              FROM users WHERE id = $1",
@@ -87,7 +88,7 @@ impl UserRepository for PgUserRepository {
             .ok_or_else(|| AppError::internal("user not found after insert"))
     }
 
-    async fn update(&self, id: i64, update: &UpdateUser) -> Result<Option<User>, AppError> {
+    async fn update(&self, id: Uuid, update: &UpdateUser) -> Result<Option<User>, AppError> {
         let row = sqlx::query_as::<_, UserRow>(
             "UPDATE users SET \
                 nickname   = COALESCE($2, nickname), \

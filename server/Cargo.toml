@@ -26,8 +26,9 @@ serde_path_to_error = "0.1"
 serde_urlencoded = "0.7"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "migrate", "chrono"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "migrate", "chrono", "uuid"] }
 chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # Cache
 redis = { version = "1", features = ["aio", "tokio-comp"] }
@@ -50,8 +51,11 @@ tracing-error = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # API documentation
-utoipa = { version = "5", features = ["axum_extras"] }
+utoipa = { version = "5", features = ["axum_extras", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
+# TypeScript bindings
+ts-rs = { version = "12.0", features = ["chrono-impl", "uuid-impl"] }
 
 [package]
 name = "ordering-food-server"
@@ -70,6 +74,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
+uuid = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
 tracing = { workspace = true }

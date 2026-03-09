@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use uuid::Uuid;
+
 use ordering_food_shared::error::AppError;
 
 use crate::domain::{NewUser, Phone, UpdateUser, User, UserDomainError};
@@ -29,7 +31,7 @@ impl UserService {
     }
 
     /// Get user by ID.
-    pub async fn get_by_id(&self, id: i64) -> Result<User, AppError> {
+    pub async fn get_by_id(&self, id: Uuid) -> Result<User, AppError> {
         self.repo
             .find_by_id(id)
             .await?
@@ -37,7 +39,7 @@ impl UserService {
     }
 
     /// Update user profile.
-    pub async fn update_profile(&self, id: i64, update: UpdateUser) -> Result<User, AppError> {
+    pub async fn update_profile(&self, id: Uuid, update: UpdateUser) -> Result<User, AppError> {
         self.repo
             .update(id, &update)
             .await?

@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 // ---------------------------------------------------------------------------
 // Domain errors
@@ -38,8 +40,9 @@ impl Phone {
 }
 
 /// User role.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum Role {
     Customer,
     Admin,
@@ -63,8 +66,9 @@ impl Role {
 }
 
 /// User account status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum UserStatus {
     Active,
     Inactive,
@@ -93,7 +97,7 @@ impl UserStatus {
 
 #[derive(Debug, Clone)]
 pub struct User {
-    pub id: i64,
+    pub id: Uuid,
     pub phone: String,
     pub nickname: String,
     pub avatar_url: String,

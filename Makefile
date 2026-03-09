@@ -53,9 +53,9 @@ fmt-check: ## Check Rust formatting
 	cd $(SERVER_DIR) && cargo fmt --check
 
 clippy: ## Run clippy with warnings denied
-	cd $(SERVER_DIR) && cargo clippy --all-targets --all-features -- -D warnings
+	cd $(SERVER_DIR) && cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 test: ## Run Rust tests
-	cd $(SERVER_DIR) && cargo test
+	cd $(SERVER_DIR) && cargo test --workspace
 
 check: fmt-check clippy test ## Run the full Rust validation suite
