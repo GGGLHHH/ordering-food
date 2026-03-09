@@ -48,7 +48,7 @@ This project ships with `/server/bacon.toml`, where the default Bacon job is con
 
 ## Configuration
 
-The server uses environment variables with double underscores as separators:
+The server automatically loads the root `.env` file on startup and then applies environment variables with double underscores as separators:
 
 - `APP__HOST`
 - `APP__PORT`
@@ -58,7 +58,9 @@ The server uses environment variables with double underscores as separators:
 - `DATABASE__MAX_CONNECTIONS`
 - `REDIS__URL`
 
-Example:
+Default local development values live in the root `.env` file.
+
+Example override for one-off runs:
 
 ```bash
 APP__PORT=9090 DATABASE__MAX_CONNECTIONS=20 make run

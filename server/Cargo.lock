@@ -1152,6 +1152,7 @@ dependencies = [
  "async-trait",
  "axum",
  "config",
+ "dotenvy",
  "redis",
  "serde",
  "serde_json",
