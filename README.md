@@ -7,6 +7,7 @@ Rust backend API scaffold for the `server` directory, with local development dep
 - Docker and Docker Compose
 - Rust stable toolchain managed by `rustup`
 - Bacon for hot reload: `cargo install --locked bacon`
+- SQLx CLI for manual migration management: `cargo install --locked sqlx-cli --no-default-features --features postgres,rustls`
 
 ## Start dependencies
 
@@ -38,6 +39,17 @@ This project ships with `/server/bacon.toml`, where the default Bacon job is con
 - run `cargo run`
 - watch Rust sources plus migrations and Cargo metadata
 - kill and restart the server automatically on change
+
+## Manage database migrations
+
+```bash
+make migration-info
+make migration-up
+make migration-down
+make migration-create NAME=add_orders_table
+```
+
+These commands invoke `cargo sqlx migrate ...` inside `/server`. `migration-up`, `migration-down`, and `migration-info` read `DATABASE__URL` from the root `.env` file, while `migration-create` creates a reversible migration skeleton by default.
 
 ## Available endpoints
 
@@ -80,6 +92,10 @@ Common commands:
 - `make logs`
 - `make run`
 - `make dev`
+- `make migration-info`
+- `make migration-up`
+- `make migration-down`
+- `make migration-create NAME=add_orders_table`
 - `make fmt`
 - `make fmt-check`
 - `make clippy`
