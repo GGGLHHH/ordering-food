@@ -6,11 +6,12 @@ Rust backend API scaffold for the `server` directory, with local development dep
 
 - Docker and Docker Compose
 - Rust stable toolchain managed by `rustup`
+- Bacon for hot reload: `cargo install --locked bacon`
 
 ## Start dependencies
 
 ```bash
-docker compose up -d
+make up
 ```
 
 This starts:
@@ -21,11 +22,22 @@ This starts:
 ## Run the API server
 
 ```bash
-cd server
-cargo run
+make run
 ```
 
-The server listens on `0.0.0.0:8080` by default.
+`make run` uses Bacon, so source changes automatically rebuild and restart the server.
+
+If you want one command that starts dependencies first and then enters the hot-reload loop, use:
+
+```bash
+make dev
+```
+
+This project ships with `/server/bacon.toml`, where the default Bacon job is configured to:
+
+- run `cargo run`
+- watch Rust sources plus migrations and Cargo metadata
+- kill and restart the server automatically on change
 
 ## Available endpoints
 
@@ -49,15 +61,31 @@ The server uses environment variables with double underscores as separators:
 Example:
 
 ```bash
-cd server
-APP__PORT=9090 DATABASE__MAX_CONNECTIONS=20 cargo run
+APP__PORT=9090 DATABASE__MAX_CONNECTIONS=20 make run
 ```
+
+## Make shortcuts
+
+```bash
+make help
+```
+
+Common commands:
+
+- `make up`
+- `make down`
+- `make ps`
+- `make logs`
+- `make run`
+- `make dev`
+- `make fmt`
+- `make fmt-check`
+- `make clippy`
+- `make test`
+- `make check`
 
 ## Validation
 
 ```bash
-cd server
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test
+make check
 ```

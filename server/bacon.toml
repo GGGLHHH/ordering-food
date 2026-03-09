@@ -1,0 +1,17 @@
+#:schema https://dystroy.org/bacon/.bacon.schema.json
+
+default_job = "server"
+env.CARGO_TERM_COLOR = "always"
+
+[jobs.server]
+command = ["cargo", "run"]
+need_stdout = true
+allow_warnings = true
+background = false
+on_change_strategy = "kill_then_restart"
+watch = ["migrations", "Cargo.toml", "Cargo.lock"]
+
+[keybindings]
+r = "job:server"
+c = "job:clippy-all"
+t = "job:test"
