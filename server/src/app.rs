@@ -182,12 +182,21 @@ fn build_cors_layer(settings: &Settings) -> Result<CorsLayer> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Settings, error::AppError, readiness::DependencyChecks};
+    use crate::{
+        config::Settings,
+        error::AppError,
+        readiness::DependencyChecks,
+        routes::{
+            API_PREFIX,
+            api::{EXAMPLE_ECHO_PATH, EXAMPLE_ITEM_PATH, EXAMPLE_SEARCH_PATH},
+        },
+    };
     use async_trait::async_trait;
     use axum::{
         body::{Body, to_bytes},
-        http::{Request, StatusCode},
+        http::{Method, Request, StatusCode},
     };
+    use serde_json::Value;
     use std::sync::Mutex;
     use tower::ServiceExt;
 
@@ -215,6 +224,17 @@ mod tests {
         build_router(AppState::new(readiness), &settings).unwrap()
     }
 
+    async fn response_json(response: Response<Body>) -> Value {
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    const LEGACY_EXAMPLE_ECHO_PATH: &str = "/api/v1/examples/echo";
+
+    fn api_uri(path: &str) -> String {
+        format!("{API_PREFIX}{path}")
+    }
+
     #[tokio::test]
     async fn live_endpoint_returns_success() {
         let app = build_test_app(Ok(DependencyChecks {
@@ -234,10 +254,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
-
-        assert!(body.contains("\"status\":\"ok\""));
+        let body = response_json(response).await;
+        assert_eq!(body["status"], "ok");
+        assert!(body.get("code").is_none());
     }
 
     #[tokio::test]
@@ -259,11 +278,9 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
-
-        assert!(body.contains("dependency_unavailable"));
-        assert!(body.contains("test-request-id"));
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "dependency_unavailable");
+        assert_eq!(body["request_id"], "test-request-id");
     }
 
     #[tokio::test]
@@ -285,15 +302,226 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
-
-        assert!(body.contains("\"postgres\":\"ok\""));
-        assert!(body.contains("\"redis\":\"ok\""));
+        let body = response_json(response).await;
+        assert_eq!(body["status"], "ok");
+        assert_eq!(body["checks"]["postgres"], "ok");
+        assert_eq!(body["checks"]["redis"], "ok");
+        assert!(body.get("code").is_none());
     }
 
     #[tokio::test]
-    async fn openapi_endpoint_returns_json_document() {
+    async fn fallback_returns_not_found_envelope() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/missing")
+                    .header("x-request-id", "req-404")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "not_found");
+        assert_eq!(body["message"], "route not found");
+        assert_eq!(body["request_id"], "req-404");
+    }
+
+    #[tokio::test]
+    async fn health_router_returns_method_not_allowed_envelope() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/health/live")
+                    .header("x-request-id", "req-405")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "method_not_allowed");
+        assert_eq!(body["request_id"], "req-405");
+    }
+
+    #[tokio::test]
+    async fn invalid_json_syntax_returns_bad_request() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(api_uri(EXAMPLE_ECHO_PATH))
+                    .header("content-type", "application/json")
+                    .header("x-request-id", "req-json-syntax")
+                    .body(Body::from("{\"name\":"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "invalid_request");
+        assert_eq!(body["request_id"], "req-json-syntax");
+        assert_eq!(body["details"]["fields"][0]["location"], "body");
+        assert_eq!(body["details"]["fields"][0]["reason"], "json_syntax");
+    }
+
+    #[tokio::test]
+    async fn json_type_mismatch_returns_validation_error() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(api_uri(EXAMPLE_ECHO_PATH))
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"name":"noodles","quantity":"many"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "validation_error");
+        assert_eq!(body["details"]["fields"][0]["location"], "body");
+        assert_eq!(body["details"]["fields"][0]["field"], "quantity");
+    }
+
+    #[tokio::test]
+    async fn query_parse_failure_returns_bad_request() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("{}?page=abc", api_uri(EXAMPLE_SEARCH_PATH)))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "invalid_request");
+        assert_eq!(body["details"]["fields"][0]["location"], "query");
+        assert_eq!(body["details"]["fields"][0]["field"], "page");
+    }
+
+    #[tokio::test]
+    async fn path_parse_failure_returns_bad_request() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(api_uri(
+                        &EXAMPLE_ITEM_PATH.replace("{item_id}", "not-a-number"),
+                    ))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "invalid_request");
+        assert_eq!(body["details"]["fields"][0]["location"], "path");
+        assert_eq!(body["details"]["fields"][0]["field"], "item_id");
+    }
+
+    #[tokio::test]
+    async fn missing_json_content_type_returns_unsupported_media_type() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(api_uri(EXAMPLE_ECHO_PATH))
+                    .body(Body::from(r#"{"name":"rice","quantity":1}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "unsupported_media_type");
+    }
+
+    #[tokio::test]
+    async fn oversized_json_body_returns_payload_too_large() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+        let large_name = "a".repeat(1024 * 1024);
+        let payload = format!(r#"{{"name":"{large_name}","quantity":1}}"#);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(api_uri(EXAMPLE_ECHO_PATH))
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "payload_too_large");
+    }
+
+    #[tokio::test]
+    async fn openapi_endpoint_returns_json_document_with_error_schemas() {
         let app = build_test_app(Ok(DependencyChecks {
             postgres: "ok".to_string(),
             redis: "ok".to_string(),
@@ -311,10 +539,40 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
+        let body = response_json(response).await;
+        let json = body.to_string();
+        let expected_path = api_uri(EXAMPLE_ECHO_PATH);
 
-        assert!(body.contains("\"openapi\""));
+        assert!(json.contains("FieldIssue"));
+        assert!(json.contains("ErrorDetails"));
+        assert!(json.contains(&expected_path));
+        assert!(!json.contains(LEGACY_EXAMPLE_ECHO_PATH));
+    }
+
+    #[tokio::test]
+    async fn old_api_v1_path_returns_not_found() {
+        let app = build_test_app(Ok(DependencyChecks {
+            postgres: "ok".to_string(),
+            redis: "ok".to_string(),
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(LEGACY_EXAMPLE_ECHO_PATH)
+                    .header("x-request-id", "req-old-api")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "not_found");
+        assert_eq!(body["request_id"], "req-old-api");
     }
 
     #[tokio::test]

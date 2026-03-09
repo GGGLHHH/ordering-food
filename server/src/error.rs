@@ -18,32 +18,68 @@ pub struct ErrorEnvelope {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<ErrorDetails>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ErrorDetails {
+    pub fields: Vec<FieldIssue>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct FieldIssue {
+    pub location: FieldLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    pub reason: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FieldLocation {
+    Body,
+    Query,
+    Path,
 }
 
 #[derive(Debug, Clone, Copy)]
 enum AppErrorKind {
+    InvalidRequest,
+    ValidationError,
+    UnsupportedMediaType,
+    PayloadTooLarge,
+    NotFound,
+    MethodNotAllowed,
     DependencyUnavailable,
     Internal,
-    Validation,
-    NotFound,
 }
 
 impl AppErrorKind {
     fn status(self) -> StatusCode {
         match self {
+            Self::InvalidRequest => StatusCode::BAD_REQUEST,
+            Self::ValidationError => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             Self::DependencyUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::Validation => StatusCode::BAD_REQUEST,
-            Self::NotFound => StatusCode::NOT_FOUND,
         }
     }
 
     fn code(self) -> &'static str {
         match self {
+            Self::InvalidRequest => "invalid_request",
+            Self::ValidationError => "validation_error",
+            Self::UnsupportedMediaType => "unsupported_media_type",
+            Self::PayloadTooLarge => "payload_too_large",
+            Self::NotFound => "not_found",
+            Self::MethodNotAllowed => "method_not_allowed",
             Self::DependencyUnavailable => "dependency_unavailable",
             Self::Internal => "internal_error",
-            Self::Validation => "validation_error",
-            Self::NotFound => "not_found",
         }
     }
 }
@@ -56,10 +92,35 @@ pub struct AppError {
     #[source]
     source: Option<BoxError>,
     request_id: Option<String>,
+    details: Option<ErrorDetails>,
     span_trace: SpanTrace,
 }
 
 impl AppError {
+    pub fn invalid_request(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::InvalidRequest, message)
+    }
+
+    pub fn validation_error(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::ValidationError, message)
+    }
+
+    pub fn unsupported_media_type(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::UnsupportedMediaType, message)
+    }
+
+    pub fn payload_too_large(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::PayloadTooLarge, message)
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::NotFound, message)
+    }
+
+    pub fn method_not_allowed(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::MethodNotAllowed, message)
+    }
+
     pub fn dependency_unavailable(message: impl Into<String>) -> Self {
         Self::new(AppErrorKind::DependencyUnavailable, message)
     }
@@ -82,16 +143,13 @@ impl AppError {
         Self::internal(message).with_source(source)
     }
 
-    pub fn validation(message: impl Into<String>) -> Self {
-        Self::new(AppErrorKind::Validation, message)
-    }
-
-    pub fn not_found(message: impl Into<String>) -> Self {
-        Self::new(AppErrorKind::NotFound, message)
-    }
-
     pub fn with_request_id(mut self, request_id: Option<String>) -> Self {
         self.request_id = request_id;
+        self
+    }
+
+    pub fn with_details(mut self, details: ErrorDetails) -> Self {
+        self.details = Some(details);
         self
     }
 
@@ -109,6 +167,7 @@ impl AppError {
             message: message.into(),
             source: None,
             request_id: None,
+            details: None,
             span_trace: SpanTrace::capture(),
         }
     }
@@ -126,6 +185,7 @@ impl AppError {
             code: self.code().to_string(),
             message: self.message.clone(),
             request_id: self.request_id.clone(),
+            details: self.details.clone(),
         }
     }
 
@@ -146,6 +206,7 @@ impl AppError {
                 request_id,
                 error_message = %self.message,
                 error_chain = %error_chain,
+                error_details = ?self.details,
                 span_trace = %self.span_trace,
                 "request returned error response"
             );
@@ -156,6 +217,7 @@ impl AppError {
                 request_id,
                 error_message = %self.message,
                 error_chain = %error_chain,
+                error_details = ?self.details,
                 "request returned client error response"
             );
         }
@@ -205,5 +267,29 @@ mod tests {
         assert!(body.contains("internal server error"));
         assert!(body.contains("request-123"));
         assert!(!body.contains("sensitive internal detail"));
+    }
+
+    #[tokio::test]
+    async fn response_serializes_error_details() {
+        let response = AppError::validation_error("request body failed validation")
+            .with_request_id(Some("request-123".to_string()))
+            .with_details(ErrorDetails {
+                fields: vec![FieldIssue {
+                    location: FieldLocation::Body,
+                    field: Some("quantity".to_string()),
+                    reason: "invalid_type".to_string(),
+                    message: "invalid type: string \"a lot\", expected u32".to_string(),
+                }],
+            })
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+
+        assert!(body.contains("validation_error"));
+        assert!(body.contains("quantity"));
+        assert!(body.contains("invalid_type"));
     }
 }

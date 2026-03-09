@@ -1,9 +1,17 @@
+pub mod api;
 pub mod health;
 
-use crate::{app::AppState, error::ErrorEnvelope, readiness::DependencyChecks};
-use axum::Router;
+use crate::{
+    app::AppState,
+    error::{ErrorDetails, ErrorEnvelope, FieldIssue, FieldLocation},
+    http::{self, PageMeta},
+    readiness::DependencyChecks,
+};
+use axum::{Router, extract::DefaultBodyLimit};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+
+pub(crate) const API_PREFIX: &str = "/api";
 
 #[derive(OpenApi)]
 #[openapi(
@@ -17,7 +25,14 @@ use utoipa_swagger_ui::SwaggerUi;
             crate::readiness::ReadyResponse,
             DependencyChecks,
             ErrorEnvelope,
+            ErrorDetails,
+            FieldIssue,
+            FieldLocation,
+            PageMeta,
         )
+    ),
+    nest(
+        (path = API_PREFIX, api = api::ApiGroupDoc)
     ),
     tags(
         (name = "health", description = "Health check endpoints")
@@ -26,9 +41,15 @@ use utoipa_swagger_ui::SwaggerUi;
 pub struct ApiDoc;
 
 pub fn router(state: AppState) -> Router {
+    let health_router = health::router().method_not_allowed_fallback(http::method_not_allowed);
+    let api_router = api::router()
+        .method_not_allowed_fallback(http::method_not_allowed)
+        .layer(DefaultBodyLimit::max(http::API_BODY_LIMIT_BYTES));
+
     Router::new()
-        .nest("/health", health::router())
-        .nest("/api/v1", Router::new())
+        .nest("/health", health_router)
+        .nest(API_PREFIX, api_router)
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .fallback(http::not_found)
         .with_state(state)
 }

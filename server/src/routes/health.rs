@@ -1,10 +1,10 @@
 use crate::{
     app::AppState,
     error::{AppError, ErrorEnvelope},
+    http::RequestContext,
     readiness::{LiveResponse, ReadyResponse},
 };
-use axum::{Extension, Json, Router, extract::State, routing::get};
-use tower_http::request_id::RequestId;
+use axum::{Json, Router, extract::State, routing::get};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -37,28 +37,16 @@ pub async fn live() -> Json<LiveResponse> {
 )]
 pub async fn ready(
     State(state): State<AppState>,
-    request_id: Option<Extension<RequestId>>,
+    context: RequestContext,
 ) -> Result<Json<ReadyResponse>, AppError> {
-    let request_id = request_id_to_string(request_id);
-
     let checks = state
         .readiness
         .check()
         .await
-        .map_err(|error| error.with_request_id(request_id.clone()))?;
+        .map_err(|error| error.with_request_id(context.request_id.clone()))?;
 
     Ok(Json(ReadyResponse {
         status: "ok".to_string(),
         checks,
     }))
-}
-
-fn request_id_to_string(request_id: Option<Extension<RequestId>>) -> Option<String> {
-    request_id.and_then(|Extension(request_id)| {
-        request_id
-            .header_value()
-            .to_str()
-            .ok()
-            .map(ToOwned::to_owned)
-    })
 }
