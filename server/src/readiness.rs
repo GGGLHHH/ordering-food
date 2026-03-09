@@ -49,9 +49,10 @@ impl ReadinessProbe for RuntimeReadiness {
             .execute(&self.pg_pool)
             .await
             .map_err(|error| {
-                AppError::dependency_unavailable(format!(
-                    "postgres readiness check failed: {error}"
-                ))
+                AppError::dependency_unavailable_with_source(
+                    "postgres readiness check failed",
+                    error,
+                )
             })?;
 
         let mut connection = self
@@ -59,7 +60,7 @@ impl ReadinessProbe for RuntimeReadiness {
             .get_multiplexed_async_connection()
             .await
             .map_err(|error| {
-                AppError::dependency_unavailable(format!("redis connection failed: {error}"))
+                AppError::dependency_unavailable_with_source("redis connection failed", error)
             })?;
 
         let pong = ping_redis(&mut connection).await?;
@@ -80,5 +81,5 @@ async fn ping_redis(connection: &mut MultiplexedConnection) -> Result<String, Ap
     redis::cmd("PING")
         .query_async(connection)
         .await
-        .map_err(|error| AppError::dependency_unavailable(format!("redis ping failed: {error}")))
+        .map_err(|error| AppError::dependency_unavailable_with_source("redis ping failed", error))
 }

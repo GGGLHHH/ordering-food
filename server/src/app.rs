@@ -1,23 +1,23 @@
 use crate::{
     config::Settings,
-    observability::init_tracing,
     readiness::{ReadinessProbe, RuntimeReadiness},
     routes,
 };
 use anyhow::{Context, Result, anyhow, ensure};
 use axum::{
     Router,
-    http::{HeaderName, HeaderValue, Method, header},
+    extract::MatchedPath,
+    http::{HeaderName, HeaderValue, Method, Request, Response, header},
 };
 use redis::aio::MultiplexedConnection;
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
-    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    request_id::{MakeRequestUuid, RequestId},
     trace::TraceLayer,
 };
-use tracing::info;
+use tracing::{Span, field, info, info_span, warn};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -32,7 +32,6 @@ impl AppState {
 
 pub async fn run() -> Result<()> {
     let settings = Settings::from_env()?;
-    init_tracing();
 
     let pg_pool = connect_postgres(&settings).await?;
 
@@ -61,12 +60,58 @@ pub async fn run() -> Result<()> {
 pub fn build_router(state: AppState, settings: &Settings) -> Result<Router> {
     let request_id_header = HeaderName::from_static("x-request-id");
     let cors_layer = build_cors_layer(settings)?;
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(|request: &Request<_>| {
+            let matched_path = request
+                .extensions()
+                .get::<MatchedPath>()
+                .map(MatchedPath::as_str)
+                .unwrap_or_else(|| request.uri().path());
+            let request_id = request
+                .extensions()
+                .get::<RequestId>()
+                .and_then(|request_id| request_id.header_value().to_str().ok())
+                .unwrap_or("-");
+
+            info_span!(
+                "http.request",
+                request_id,
+                method = %request.method(),
+                matched_path,
+                status_code = field::Empty,
+                latency_ms = field::Empty,
+            )
+        })
+        .on_request(|request: &Request<_>, _span: &Span| {
+            tracing::debug!(method = %request.method(), path = request.uri().path(), "request started");
+        })
+        .on_response(|response: &Response<_>, latency: Duration, span: &Span| {
+            let status_code = response.status().as_u16();
+            let latency_ms = latency.as_millis() as u64;
+
+            span.record("status_code", field::display(status_code));
+            span.record("latency_ms", latency_ms);
+
+            if response.status().is_server_error() {
+                warn!(parent: span, "request completed with server error");
+            } else if response.status().is_client_error() {
+                warn!(parent: span, "request completed with client error");
+            } else {
+                info!(parent: span, "request completed");
+            }
+        })
+        .on_failure(());
 
     Ok(routes::router(state)
-        .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
-        .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
-        .layer(SetRequestIdLayer::new(request_id_header, MakeRequestUuid)))
+        .layer(tower_http::request_id::PropagateRequestIdLayer::new(
+            request_id_header.clone(),
+        ))
+        .layer(trace_layer)
+        .layer(tower_http::request_id::SetRequestIdLayer::new(
+            request_id_header,
+            MakeRequestUuid,
+        )))
 }
 
 async fn connect_postgres(settings: &Settings) -> Result<PgPool> {
@@ -74,12 +119,12 @@ async fn connect_postgres(settings: &Settings) -> Result<PgPool> {
         .max_connections(settings.database.max_connections)
         .connect(&settings.database.url)
         .await
-        .with_context(|| format!("failed to connect postgres: {}", settings.database.url))
+        .context("failed to connect to postgres")
 }
 
 async fn connect_redis(settings: &Settings) -> Result<redis::Client> {
     let client = redis::Client::open(settings.redis.url.as_str())
-        .with_context(|| format!("failed to create redis client: {}", settings.redis.url))?;
+        .context("failed to create redis client")?;
 
     let mut connection = client
         .get_multiplexed_async_connection()
@@ -143,22 +188,29 @@ mod tests {
         body::{Body, to_bytes},
         http::{Request, StatusCode},
     };
+    use std::sync::Mutex;
     use tower::ServiceExt;
 
     struct MockReadiness {
-        result: Result<DependencyChecks, AppError>,
+        result: Mutex<Option<Result<DependencyChecks, AppError>>>,
     }
 
     #[async_trait]
     impl ReadinessProbe for MockReadiness {
         async fn check(&self) -> Result<DependencyChecks, AppError> {
-            self.result.clone()
+            self.result
+                .lock()
+                .unwrap()
+                .take()
+                .expect("mock readiness result already consumed")
         }
     }
 
     fn build_test_app(result: Result<DependencyChecks, AppError>) -> Router {
         let settings = Settings::from_overrides(std::iter::empty::<(String, String)>()).unwrap();
-        let readiness = Arc::new(MockReadiness { result });
+        let readiness = Arc::new(MockReadiness {
+            result: Mutex::new(Some(result)),
+        });
 
         build_router(AppState::new(readiness), &settings).unwrap()
     }
