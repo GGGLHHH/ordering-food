@@ -3,9 +3,11 @@ pub mod health;
 
 use crate::{
     app::AppState,
+    readiness::DependencyChecks,
+};
+use ordering_food_shared::{
     error::{ErrorDetails, ErrorEnvelope, FieldIssue, FieldLocation},
     http::{self, PageMeta},
-    readiness::DependencyChecks,
 };
 use axum::{Router, extract::DefaultBodyLimit};
 use utoipa::OpenApi;
@@ -32,7 +34,8 @@ pub(crate) const API_PREFIX: &str = "/api";
         )
     ),
     nest(
-        (path = API_PREFIX, api = api::ApiGroupDoc)
+        (path = API_PREFIX, api = api::ApiGroupDoc),
+        (path = API_PREFIX, api = ordering_food_user::http::UserApiDoc),
     ),
     tags(
         (name = "health", description = "Health check endpoints")
@@ -43,6 +46,7 @@ pub struct ApiDoc;
 pub fn router(state: AppState) -> Router {
     let health_router = health::router().method_not_allowed_fallback(http::method_not_allowed);
     let api_router = api::router()
+        .merge(ordering_food_user::http::router())
         .method_not_allowed_fallback(http::method_not_allowed)
         .layer(DefaultBodyLimit::max(http::API_BODY_LIMIT_BYTES));
 

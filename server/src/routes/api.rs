@@ -1,5 +1,5 @@
-use crate::{
-    app::AppState,
+use crate::app::AppState;
+use ordering_food_shared::{
     error::{ErrorDetails, ErrorEnvelope, FieldIssue, FieldLocation},
     http::{ApiJson, ApiPath, ApiQuery, PageMeta},
 };

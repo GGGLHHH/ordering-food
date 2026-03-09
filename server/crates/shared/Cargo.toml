@@ -1,0 +1,23 @@
+[package]
+name = "ordering-food-shared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_path_to_error = { workspace = true }
+serde_urlencoded = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-error = { workspace = true }
+tracing-subscriber = { workspace = true }
+tower-http = { workspace = true }
+utoipa = { workspace = true }
+anyhow = { workspace = true }
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

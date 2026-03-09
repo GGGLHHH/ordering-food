@@ -1,8 +1,10 @@
 use crate::{
     app::AppState,
+    readiness::{LiveResponse, ReadyResponse},
+};
+use ordering_food_shared::{
     error::{AppError, ErrorEnvelope},
     http::RequestContext,
-    readiness::{LiveResponse, ReadyResponse},
 };
 use axum::{Json, Router, extract::State, routing::get};
 

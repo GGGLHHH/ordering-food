@@ -1,4 +1,4 @@
-use crate::error::AppError;
+use ordering_food_shared::error::AppError;
 use async_trait::async_trait;
 use redis::aio::MultiplexedConnection;
 use serde::Serialize;

@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY crates ./crates
 COPY migrations ./migrations
 
 RUN cargo build --release --locked --bin ordering-food-server

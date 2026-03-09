@@ -1,7 +1,5 @@
-use ordering_food_server::{
-    app::run,
-    observability::{format_anyhow_chain, init_tracing, install_panic_hook},
-};
+use ordering_food_server::app::run;
+use ordering_food_shared::observability::{format_anyhow_chain, init_tracing, install_panic_hook};
 use tracing::error;
 
 #[tokio::main]

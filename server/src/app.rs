@@ -1,17 +1,14 @@
-use crate::{
-    config::Settings,
-    readiness::{ReadinessProbe, RuntimeReadiness},
-    routes,
-};
+use std::sync::Arc;
+use std::time::Duration;
+
 use anyhow::{Context, Result, anyhow, ensure};
 use axum::{
     Router,
-    extract::MatchedPath,
+    extract::{FromRef, MatchedPath},
     http::{HeaderName, HeaderValue, Method, Request, Response, header},
 };
 use redis::aio::MultiplexedConnection;
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use std::{sync::Arc, time::Duration};
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     request_id::{MakeRequestUuid, RequestId},
@@ -19,14 +16,32 @@ use tower_http::{
 };
 use tracing::{Span, field, info, info_span, warn};
 
+use ordering_food_shared::config::Settings;
+use ordering_food_user::{pg_repository::PgUserRepository, service::UserService};
+
+use crate::{
+    readiness::{ReadinessProbe, RuntimeReadiness},
+    routes,
+};
+
 #[derive(Clone)]
 pub struct AppState {
     pub readiness: Arc<dyn ReadinessProbe>,
+    pub user_service: Arc<UserService>,
 }
 
 impl AppState {
-    pub fn new(readiness: Arc<dyn ReadinessProbe>) -> Self {
-        Self { readiness }
+    pub fn new(readiness: Arc<dyn ReadinessProbe>, user_service: Arc<UserService>) -> Self {
+        Self {
+            readiness,
+            user_service,
+        }
+    }
+}
+
+impl FromRef<AppState> for Arc<UserService> {
+    fn from_ref(state: &AppState) -> Self {
+        state.user_service.clone()
     }
 }
 
@@ -44,8 +59,11 @@ pub async fn run() -> Result<()> {
 
     let redis_client = connect_redis(&settings).await?;
 
+    let user_repo = Arc::new(PgUserRepository::new(pg_pool.clone()));
+    let user_service = Arc::new(UserService::new(user_repo));
+
     let readiness = Arc::new(RuntimeReadiness::new(pg_pool, redis_client));
-    let app = build_router(AppState::new(readiness), &settings)?;
+    let app = build_router(AppState::new(readiness, user_service), &settings)?;
     let listener = tokio::net::TcpListener::bind(settings.app.bind_address())
         .await
         .with_context(|| format!("failed to bind {}", settings.app.bind_address()))?;
@@ -182,14 +200,21 @@ fn build_cors_layer(settings: &Settings) -> Result<CorsLayer> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
+    use ordering_food_shared::{
         config::Settings,
         error::AppError,
+    };
+    use crate::{
         readiness::DependencyChecks,
         routes::{
             API_PREFIX,
             api::{EXAMPLE_ECHO_PATH, EXAMPLE_ITEM_PATH, EXAMPLE_SEARCH_PATH},
         },
+    };
+    use ordering_food_user::{
+        domain::{NewUser, Phone, UpdateUser, User},
+        repository::UserRepository,
+        service::UserService,
     };
     use async_trait::async_trait;
     use axum::{
@@ -215,13 +240,33 @@ mod tests {
         }
     }
 
+    struct MockUserRepository;
+
+    #[async_trait]
+    impl UserRepository for MockUserRepository {
+        async fn find_by_id(&self, _id: i64) -> Result<Option<User>, AppError> {
+            unimplemented!()
+        }
+        async fn find_by_phone(&self, _phone: &Phone) -> Result<Option<User>, AppError> {
+            unimplemented!()
+        }
+        async fn create(&self, _new_user: &NewUser) -> Result<User, AppError> {
+            unimplemented!()
+        }
+        async fn update(&self, _id: i64, _update: &UpdateUser) -> Result<Option<User>, AppError> {
+            unimplemented!()
+        }
+    }
+
     fn build_test_app(result: Result<DependencyChecks, AppError>) -> Router {
         let settings = Settings::from_overrides(std::iter::empty::<(String, String)>()).unwrap();
         let readiness = Arc::new(MockReadiness {
             result: Mutex::new(Some(result)),
         });
+        let user_repo: Arc<dyn UserRepository> = Arc::new(MockUserRepository);
+        let user_service = Arc::new(UserService::new(user_repo));
 
-        build_router(AppState::new(readiness), &settings).unwrap()
+        build_router(AppState::new(readiness, user_service), &settings).unwrap()
     }
 
     async fn response_json(response: Response<Body>) -> Value {

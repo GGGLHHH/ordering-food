@@ -1,0 +1,14 @@
+[package]
+name = "ordering-food-user"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ordering-food-shared = { workspace = true }
+axum = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+utoipa = { workspace = true }
