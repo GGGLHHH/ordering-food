@@ -51,6 +51,7 @@ This builds and starts the full Docker Compose stack:
 - PostgreSQL
 - Redis
 - `ordering-food-server`
+- `autoheal` for unhealthy container restarts
 
 ## Manage database migrations
 

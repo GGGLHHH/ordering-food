@@ -5,7 +5,7 @@ SERVER_DIR := server
 ROOT_ENV_FILE := .env
 SQLX := cargo sqlx
 INFRA_SERVICES := postgres redis
-FULL_STACK_SERVICES := postgres redis server
+FULL_STACK_SERVICES := postgres redis server autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
 .PHONY: help up compose-up down ps logs run dev migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
