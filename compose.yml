@@ -34,6 +34,32 @@ services:
       retries: 10
       start_period: 5s
 
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ordering-food-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      APP__HOST: 0.0.0.0
+      DATABASE__URL: postgres://ordering_food:ordering_food@postgres:5432/ordering_food
+      REDIS__URL: redis://redis:6379
+    ports:
+      - "${APP__PORT:-8080}:${APP__PORT:-8080}"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
 volumes:
   postgres-data:
   redis-data:

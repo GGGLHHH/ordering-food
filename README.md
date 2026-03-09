@@ -15,12 +15,12 @@ Rust backend API scaffold for the `server` directory, with local development dep
 make up
 ```
 
-This starts:
+This starts local infrastructure dependencies only:
 
 - PostgreSQL `18.3` on `127.0.0.1:5432`
 - Redis `8.6.1` on `127.0.0.1:6379`
 
-## Run the API server
+## Run the API server locally
 
 ```bash
 make run
@@ -40,6 +40,18 @@ This project ships with `/server/bacon.toml`, where the default Bacon job is con
 - watch Rust sources plus migrations and Cargo metadata
 - kill and restart the server automatically on change
 
+## Run the full containerized stack
+
+```bash
+make compose-up
+```
+
+This builds and starts the full Docker Compose stack:
+
+- PostgreSQL
+- Redis
+- `ordering-food-server`
+
 ## Manage database migrations
 
 ```bash
@@ -50,6 +62,14 @@ make migration-create NAME=add_orders_table
 ```
 
 These commands invoke `cargo sqlx migrate ...` inside `/server`. `migration-up`, `migration-down`, and `migration-info` read `DATABASE__URL` from the root `.env` file, while `migration-create` creates a reversible migration skeleton by default.
+
+## Build a container image
+
+```bash
+docker build -f server/Dockerfile -t ordering-food-server:local server
+```
+
+The runtime image defaults to `APP__HOST=0.0.0.0` and `APP__PORT=8080`. If you pass the root `.env` file into the container, override `APP__HOST` back to `0.0.0.0`, otherwise the server will only bind to the container loopback interface.
 
 ## Available endpoints
 
@@ -87,6 +107,7 @@ make help
 Common commands:
 
 - `make up`
+- `make compose-up`
 - `make down`
 - `make ps`
 - `make logs`

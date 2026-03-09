@@ -4,15 +4,20 @@ COMPOSE := docker compose
 SERVER_DIR := server
 ROOT_ENV_FILE := .env
 SQLX := cargo sqlx
+INFRA_SERVICES := postgres redis
+FULL_STACK_SERVICES := postgres redis server
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
-.PHONY: help up down ps logs run dev migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
+.PHONY: help up compose-up down ps logs run dev migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 up: ## Start Postgres and Redis in the background
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d $(INFRA_SERVICES)
+
+compose-up: ## Build and start the full containerized stack
+	$(COMPOSE) up -d --build $(FULL_STACK_SERVICES)
 
 down: ## Stop local development containers
 	$(COMPOSE) down
