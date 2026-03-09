@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API Server",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin",
+          "ordering-food-server",
+          "--package",
+          "ordering-food-server"
+        ],
+        "filter": {
+          "name": "ordering-food-server",
+          "kind": "bin"
+        },
+        "cwd": "${workspaceFolder}/server"
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/server",
+      "sourceLanguages": [
+        "rust"
+      ],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Attach to API Server Process",
+      "type": "lldb",
+      "request": "attach",
+      "pid": "${command:pickProcess}",
+      "sourceLanguages": [
+        "rust"
+      ]
+    }
+  ]
+}
