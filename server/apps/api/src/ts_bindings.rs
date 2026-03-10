@@ -1,0 +1,173 @@
+use crate::{
+    error::ErrorEnvelope,
+    http::PageMeta,
+    readiness::{LiveResponse, ReadyResponse},
+    routes::api::{
+        ExampleItemPath, ExampleItemResponse, ExamplePayload, ExamplePayloadResponse,
+        ExampleSearchQuery, ExampleSearchResponse,
+    },
+    routes::identity::{
+        BindIdentityUserIdentityRequest, CreateIdentityUserIdentityRequest,
+        CreateIdentityUserRequest, IdentityUserIdentityResponse, IdentityUserPath,
+        IdentityUserProfileResponse, IdentityUserResponse, UpdateIdentityUserProfileRequest,
+    },
+};
+use anyhow::Context;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+use ts_rs::{Config, TS};
+
+const GENERATED_API_DIR: &str = "../../../frontend/src/generated/api";
+
+pub fn export_bindings() -> anyhow::Result<PathBuf> {
+    let output_dir = default_output_dir();
+    export_bindings_to(&output_dir)?;
+    Ok(output_dir)
+}
+
+pub fn default_output_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(GENERATED_API_DIR)
+}
+
+pub fn export_bindings_to(output_dir: &Path) -> anyhow::Result<()> {
+    reset_output_dir(output_dir)?;
+
+    let config = Config::new()
+        .with_out_dir(output_dir)
+        .with_large_int("number");
+
+    export_contract_types(&config)?;
+    write_index_file(output_dir)?;
+
+    Ok(())
+}
+
+fn export_contract_types(config: &Config) -> Result<(), ts_rs::ExportError> {
+    ErrorEnvelope::export_all(config)?;
+    LiveResponse::export_all(config)?;
+    ReadyResponse::export_all(config)?;
+    PageMeta::export_all(config)?;
+    ExamplePayload::export_all(config)?;
+    ExamplePayloadResponse::export_all(config)?;
+    ExampleSearchQuery::export_all(config)?;
+    ExampleSearchResponse::export_all(config)?;
+    ExampleItemPath::export_all(config)?;
+    ExampleItemResponse::export_all(config)?;
+    BindIdentityUserIdentityRequest::export_all(config)?;
+    CreateIdentityUserIdentityRequest::export_all(config)?;
+    CreateIdentityUserRequest::export_all(config)?;
+    UpdateIdentityUserProfileRequest::export_all(config)?;
+    IdentityUserPath::export_all(config)?;
+    IdentityUserIdentityResponse::export_all(config)?;
+    IdentityUserProfileResponse::export_all(config)?;
+    IdentityUserResponse::export_all(config)?;
+    Ok(())
+}
+
+fn reset_output_dir(output_dir: &Path) -> anyhow::Result<()> {
+    if output_dir.exists() {
+        fs::remove_dir_all(output_dir).with_context(|| {
+            format!(
+                "failed to clear existing TS bindings directory `{}`",
+                output_dir.display()
+            )
+        })?;
+    }
+
+    fs::create_dir_all(output_dir).with_context(|| {
+        format!(
+            "failed to create TS bindings directory `{}`",
+            output_dir.display()
+        )
+    })
+}
+
+fn write_index_file(output_dir: &Path) -> anyhow::Result<()> {
+    let mut export_stems = fs::read_dir(output_dir)
+        .with_context(|| {
+            format!(
+                "failed to read TS bindings directory `{}`",
+                output_dir.display()
+            )
+        })?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            let extension = path.extension()?.to_str()?;
+            let stem = path.file_stem()?.to_str()?;
+
+            (extension == "ts" && stem != "index").then(|| stem.to_string())
+        })
+        .collect::<Vec<_>>();
+    export_stems.sort();
+
+    let index_contents = export_stems
+        .into_iter()
+        .map(|stem| format!("export * from \"./{stem}\";"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let index_contents = if index_contents.is_empty() {
+        String::new()
+    } else {
+        format!("{index_contents}\n")
+    };
+
+    fs::write(output_dir.join("index.ts"), index_contents).with_context(|| {
+        format!(
+            "failed to write `{}`",
+            output_dir.join("index.ts").display()
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn export_bindings_writes_expected_contract_files() {
+        let temp_root = std::env::temp_dir().join(format!(
+            "ordering-food-ts-bindings-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        export_bindings_to(&temp_root).unwrap();
+
+        let error_envelope = fs::read_to_string(temp_root.join("ErrorEnvelope.ts")).unwrap();
+        let bind_identity_user_identity_request =
+            fs::read_to_string(temp_root.join("BindIdentityUserIdentityRequest.ts")).unwrap();
+        let create_identity_user_request =
+            fs::read_to_string(temp_root.join("CreateIdentityUserRequest.ts")).unwrap();
+        let ready_response = fs::read_to_string(temp_root.join("ReadyResponse.ts")).unwrap();
+        let example_item_response =
+            fs::read_to_string(temp_root.join("ExampleItemResponse.ts")).unwrap();
+        let identity_user_response =
+            fs::read_to_string(temp_root.join("IdentityUserResponse.ts")).unwrap();
+        let update_identity_user_profile_request =
+            fs::read_to_string(temp_root.join("UpdateIdentityUserProfileRequest.ts")).unwrap();
+        let index = fs::read_to_string(temp_root.join("index.ts")).unwrap();
+
+        assert!(error_envelope.contains("request_id?: string"));
+        assert!(bind_identity_user_identity_request.contains("identity_type: string"));
+        assert!(create_identity_user_request.contains("display_name: string"));
+        assert!(ready_response.contains("checks: DependencyChecks"));
+        assert!(example_item_response.contains("item_id: number"));
+        assert!(identity_user_response.contains("deleted_at?: string"));
+        assert!(update_identity_user_profile_request.contains("display_name: string"));
+        assert!(index.contains("export * from \"./ErrorEnvelope\";"));
+        assert!(index.contains("export * from \"./BindIdentityUserIdentityRequest\";"));
+        assert!(index.contains("export * from \"./CreateIdentityUserRequest\";"));
+        assert!(index.contains("export * from \"./IdentityUserResponse\";"));
+        assert!(index.contains("export * from \"./UpdateIdentityUserProfileRequest\";"));
+        assert!(index.contains("export * from \"./ReadyResponse\";"));
+        assert!(index.contains("export * from \"./ExampleItemResponse\";"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+}

@@ -3,10 +3,12 @@ use crate::composition::{
     contribution::{ApiContextContribution, ApiNamedReadinessCheck},
     platform::ApiPlatform,
 };
+use crate::routes::identity::{self, IdentityApiDoc};
 use ordering_food_bootstrap_core::{
     BootstrapRegistration, ContextDescriptor, MigrationRegistration,
 };
 use ordering_food_identity_infrastructure_sqlx::{MIGRATOR, build_identity_module};
+use utoipa::OpenApi;
 
 pub fn register_identity() -> ApiContextRegistration {
     let descriptor = ContextDescriptor {
@@ -52,6 +54,11 @@ fn identity_bootstrap_registration(
                 context_id,
                 "module_ready",
             ));
+            contribution.add_route_mount(
+                identity::IDENTITY_ROUTE_PREFIX,
+                identity::router(module.clone()),
+            );
+            contribution.add_openapi_document(IdentityApiDoc::openapi());
             contribution.retain_private(module);
 
             Ok::<_, std::io::Error>(contribution)

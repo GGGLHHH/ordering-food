@@ -134,8 +134,35 @@ The runtime image defaults to `APP__HOST=0.0.0.0` and `APP__PORT=8080`. If you p
 - `POST /api/examples/echo`
 - `GET /api/examples/search?page=1`
 - `GET /api/examples/items/{item_id}`
+- `POST /api/identity/users`
+- `GET /api/identity/users/{user_id}`
+- `PATCH /api/identity/users/{user_id}/profile`
+- `POST /api/identity/users/{user_id}/identities`
+- `POST /api/identity/users/{user_id}/disable`
+- `POST /api/identity/users/{user_id}/soft-delete`
 
 The first phase wires the `identity` context end-to-end internally without exposing public business endpoints yet.
+
+## Export frontend TypeScript bindings
+
+The repository uses `ts-rs` from the API contract layer as the single source of truth for frontend bindings.
+
+- Only public HTTP contract types are exported to TypeScript
+- Domain, application, infrastructure, runtime, and config types stay backend-internal
+- Future business endpoints should define frontend-facing DTOs in `apps/api` and map them to application/domain models explicitly
+- The `identity` endpoints already follow this pattern and export their request/response contracts via `ts-rs`
+
+Generate bindings into `frontend/src/generated/api` with:
+
+```bash
+make export-ts
+```
+
+This delegates to:
+
+```bash
+cargo run -p ordering-food-api --bin export-ts-bindings
+```
 
 ## Configuration
 
@@ -172,6 +199,7 @@ Common commands:
 - `make logs`
 - `make run`
 - `make dev`
+- `make export-ts`
 - `make migration-info`
 - `make migration-up`
 - `make migration-down`

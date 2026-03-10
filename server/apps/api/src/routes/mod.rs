@@ -1,5 +1,6 @@
 pub mod api;
 pub mod health;
+pub mod identity;
 
 use crate::{
     app::AppState,

@@ -8,35 +8,39 @@ use std::error::Error as StdError;
 use thiserror::Error;
 use tracing::{error, warn};
 use tracing_error::SpanTrace;
+use ts_rs::TS;
 use utoipa::ToSchema;
 
 type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
 pub struct ErrorEnvelope {
     pub code: String,
     pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub request_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub details: Option<ErrorDetails>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
 pub struct ErrorDetails {
     pub fields: Vec<FieldIssue>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
 pub struct FieldIssue {
     pub location: FieldLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub field: Option<String>,
     pub reason: String,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum FieldLocation {
     Body,
@@ -48,6 +52,7 @@ pub enum FieldLocation {
 enum AppErrorKind {
     InvalidRequest,
     ValidationError,
+    Conflict,
     UnsupportedMediaType,
     PayloadTooLarge,
     NotFound,
@@ -61,6 +66,7 @@ impl AppErrorKind {
         match self {
             Self::InvalidRequest => StatusCode::BAD_REQUEST,
             Self::ValidationError => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::Conflict => StatusCode::CONFLICT,
             Self::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::NotFound => StatusCode::NOT_FOUND,
@@ -74,6 +80,7 @@ impl AppErrorKind {
         match self {
             Self::InvalidRequest => "invalid_request",
             Self::ValidationError => "validation_error",
+            Self::Conflict => "conflict",
             Self::UnsupportedMediaType => "unsupported_media_type",
             Self::PayloadTooLarge => "payload_too_large",
             Self::NotFound => "not_found",
@@ -103,6 +110,10 @@ impl AppError {
 
     pub fn validation_error(message: impl Into<String>) -> Self {
         Self::new(AppErrorKind::ValidationError, message)
+    }
+
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::Conflict, message)
     }
 
     pub fn unsupported_media_type(message: impl Into<String>) -> Self {

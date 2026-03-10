@@ -5,6 +5,7 @@ fn route_modules_do_not_reference_identity_sqlx_infrastructure() {
     for relative_path in [
         "src/routes/api.rs",
         "src/routes/health.rs",
+        "src/routes/identity.rs",
         "src/routes/mod.rs",
         "src/http.rs",
     ] {
@@ -46,6 +47,7 @@ fn only_composition_modules_reference_identity_sqlx_infrastructure() {
         "src/readiness.rs",
         "src/routes/api.rs",
         "src/routes/health.rs",
+        "src/routes/identity.rs",
         "src/routes/mod.rs",
         "src/runtime.rs",
     ] {

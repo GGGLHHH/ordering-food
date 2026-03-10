@@ -7,3 +7,4 @@ pub mod observability;
 pub mod readiness;
 pub mod routes;
 pub mod runtime;
+pub mod ts_bindings;
