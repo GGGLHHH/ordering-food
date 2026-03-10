@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "skills": {
+    "dbhub": {
+      "source": "bytebase/dbhub",
+      "sourceType": "github",
+      "computedHash": "8a5481f823e6cd662ec6c3587c43475f4bf86e80bf76806e511c34590114f53c"
+    },
+    "pnpm": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "318f9fca2441a3e06fedc336e195dd18be5dbe901064e4fa71b76b40b096ab3a"
+    },
+    "react": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "d9de6cdfc7704d0ce76e0e5383381f8da66745d3a95835278de1b69a39aad7d4"
+    },
+    "shadcn": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "7740f3fca237cf6dc1ad3a7f60f61f6b03a6c8c53edd251e4bdfe4946df6fa75"
+    },
+    "tailwindcss": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "9b654cb52ef4a3f8d57cc5e9c64792cf6b5304e08625321c90d0641f5a20dfbe"
+    },
+    "vite": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "0293c251e4d6ff4818e8d2faed2a92f98d8d73c2f4819bd754faf93ca134d6fe"
+    },
+    "vitest": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "669c7275f7e1379b06b2bcfa593603aead4c983b951c7e8edbc09640aa38d0a1"
+    }
+  }
+}
