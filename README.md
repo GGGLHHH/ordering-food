@@ -49,30 +49,33 @@ This starts local infrastructure dependencies only:
 
 ## Project MCP configuration
 
-This repository checks in project-level DBHub MCP configuration for common AI coding clients:
+This repository checks in project-level MCP configuration for common AI coding clients:
 
 - `.codex/config.toml` for Codex CLI and Codex IDE extension
 - `.mcp.json` for Claude Code
-- `.cursor/mcp.json` for Cursor workspace MCP
-- `.vscode/mcp.json` for VS Code workspace MCP
 
-All project-level configurations point to `http://localhost:1000/mcp`.
+The Codex and Claude project configurations both define these MCP servers:
 
-Codex loads `.codex/config.toml` only for trusted projects.
+- `dbhub` at `http://localhost:1000/mcp`
+- `gitnexus` via `npx -y gitnexus@latest mcp`
 
-On this machine, `codex-cli 0.112.0` does not auto-load the project-level MCP config during `codex` or `codex exec`, even though the current official docs describe that workflow. For a stable repository-local entrypoint today, use:
+Codex loads `.codex/config.toml` only for trusted projects. If Codex reports that project config is disabled, trust the repository once in the TUI or add a user-level trust entry to `~/.codex/config.toml`:
 
-```bash
-make codex
+```toml
+[projects."/absolute/path/to/ordering-food"]
+trust_level = "trusted"
 ```
 
-That target delegates to `./scripts/codex-project.sh`, which injects the same DBHub server via:
+After the project is trusted, running `codex` or `codex exec` from this repository will automatically load the project-level MCP servers. You can verify it with:
 
 ```bash
-codex -c 'mcp_servers.dbhub.url="http://localhost:1000/mcp"'
+codex mcp list
 ```
+
+This repository also mirrors the Claude `gitnexus` skills into project-level Codex skills under `.codex/skills/gitnexus`, so trusted Codex sessions can invoke the same skill set.
 
 ## Run the API server locally
+
 
 ```bash
 make run
@@ -152,16 +155,18 @@ The repository uses `ts-rs` from the API contract layer as the single source of 
 - Future business endpoints should define frontend-facing DTOs in `apps/api` and map them to application/domain models explicitly
 - The `identity` endpoints already follow this pattern and export their request/response contracts via `ts-rs`
 
-Generate bindings into `frontend/src/generated/api` with:
+Set `GENERATED_API_DIR` before exporting bindings. The checked-in root `.env` uses the default local path `../frontend/src/generated/api`, and `make export-ts` forwards that environment variable into the export binary.
+
+Generate bindings with:
 
 ```bash
 make export-ts
 ```
 
-This delegates to:
+If you run the binary directly, pass the environment variable explicitly:
 
 ```bash
-cargo run -p ordering-food-api --bin export-ts-bindings
+cd server && GENERATED_API_DIR=../frontend/src/generated/api cargo run -p ordering-food-api --bin export-ts-bindings
 ```
 
 ## Configuration

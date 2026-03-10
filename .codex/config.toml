@@ -1,2 +1,6 @@
 [mcp_servers.dbhub]
 url = "http://localhost:1000/mcp"
+
+[mcp_servers.gitnexus]
+command = "npx"
+args = ["-y", "gitnexus@latest", "mcp"]

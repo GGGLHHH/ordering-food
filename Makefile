@@ -8,8 +8,9 @@ SQLX_MIGRATIONS_DIR := crates/identity-infrastructure-sqlx/migrations
 INFRA_SERVICES := postgres redis dbhub
 FULL_STACK_SERVICES := $(INFRA_SERVICES) server autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
+GENERATED_API_DIR ?= $(shell awk -F= '/^GENERATED_API_DIR=/{sub(/^GENERATED_API_DIR=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
-.PHONY: help up compose-up down ps logs run dev codex export-ts migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
+.PHONY: help up compose-up down ps logs run dev export-ts migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -34,11 +35,9 @@ run: ## Run the Rust API with Bacon auto-reload
 
 dev: up run ## Start dependencies and enter the Bacon hot-reload loop
 
-codex: ## Launch Codex with project DBHub MCP injected for current CLI compatibility
-	./scripts/codex-project.sh
-
 export-ts: ## Export frontend TypeScript bindings from API contracts
-	cd $(SERVER_DIR) && cargo run -p ordering-food-api --bin export-ts-bindings
+	@test -n "$(GENERATED_API_DIR)" || (echo "GENERATED_API_DIR is required, e.g. GENERATED_API_DIR=../frontend/src/generated/api" && exit 1)
+	cd $(SERVER_DIR) && GENERATED_API_DIR='$(GENERATED_API_DIR)' cargo run -p ordering-food-api --bin export-ts-bindings
 
 migration-up: ## Apply pending database migrations with sqlx-cli
 	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' $(SQLX) migrate run --source $(SQLX_MIGRATIONS_DIR)

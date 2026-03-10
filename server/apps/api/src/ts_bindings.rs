@@ -12,23 +12,36 @@ use crate::{
         IdentityUserProfileResponse, IdentityUserResponse, UpdateIdentityUserProfileRequest,
     },
 };
-use anyhow::Context;
+use anyhow::{Context, anyhow, ensure};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 use ts_rs::{Config, TS};
 
-const GENERATED_API_DIR: &str = "../../../frontend/src/generated/api";
+const GENERATED_API_DIR_ENV_VAR: &str = "GENERATED_API_DIR";
 
 pub fn export_bindings() -> anyhow::Result<PathBuf> {
-    let output_dir = default_output_dir();
+    let output_dir = configured_output_dir()?;
     export_bindings_to(&output_dir)?;
     Ok(output_dir)
 }
 
-pub fn default_output_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(GENERATED_API_DIR)
+pub fn configured_output_dir() -> anyhow::Result<PathBuf> {
+    resolve_output_dir(std::env::var(GENERATED_API_DIR_ENV_VAR).ok())
+}
+
+fn resolve_output_dir(env_value: Option<String>) -> anyhow::Result<PathBuf> {
+    let raw_path = env_value.ok_or_else(|| {
+        anyhow!("{GENERATED_API_DIR_ENV_VAR} is not set; configure it before exporting TS bindings")
+    })?;
+    let trimmed_path = raw_path.trim();
+    ensure!(
+        !trimmed_path.is_empty(),
+        "{GENERATED_API_DIR_ENV_VAR} must not be empty"
+    );
+
+    Ok(PathBuf::from(trimmed_path))
 }
 
 pub fn export_bindings_to(output_dir: &Path) -> anyhow::Result<()> {
@@ -126,6 +139,32 @@ fn write_index_file(output_dir: &Path) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn configured_output_dir_requires_env_var() {
+        let error = resolve_output_dir(None).unwrap_err();
+
+        assert!(error.to_string().contains("GENERATED_API_DIR is not set"));
+    }
+
+    #[test]
+    fn configured_output_dir_rejects_empty_env_var() {
+        let error = resolve_output_dir(Some("   ".to_string())).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("GENERATED_API_DIR must not be empty")
+        );
+    }
+
+    #[test]
+    fn configured_output_dir_uses_env_var_value() {
+        let output_dir =
+            resolve_output_dir(Some("../frontend/src/generated/api".to_string())).unwrap();
+
+        assert_eq!(output_dir, PathBuf::from("../frontend/src/generated/api"));
+    }
 
     #[test]
     fn export_bindings_writes_expected_contract_files() {
