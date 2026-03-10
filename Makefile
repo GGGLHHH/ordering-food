@@ -5,19 +5,19 @@ SERVER_DIR := server
 ROOT_ENV_FILE := .env
 SQLX := cargo sqlx
 SQLX_MIGRATIONS_DIR := crates/identity-infrastructure-sqlx/migrations
-INFRA_SERVICES := postgres redis
-FULL_STACK_SERVICES := postgres redis server autoheal
+INFRA_SERVICES := postgres redis dbhub
+FULL_STACK_SERVICES := $(INFRA_SERVICES) server autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
-.PHONY: help up compose-up down ps logs run dev migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
+.PHONY: help up compose-up down ps logs run dev codex migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-up: ## Start Postgres and Redis in the background
+up: ## Start Postgres, Redis, and DBHub in the background
 	$(COMPOSE) up -d $(INFRA_SERVICES)
 
-compose-up: ## Build and start the full containerized stack
+compose-up: ## Build and start the full containerized stack including DBHub
 	$(COMPOSE) up -d --build $(FULL_STACK_SERVICES)
 
 down: ## Stop local development containers
@@ -33,6 +33,9 @@ run: ## Run the Rust API with Bacon auto-reload
 	cd $(SERVER_DIR) && bacon
 
 dev: up run ## Start dependencies and enter the Bacon hot-reload loop
+
+codex: ## Launch Codex with project DBHub MCP injected for current CLI compatibility
+	./scripts/codex-project.sh
 
 migration-up: ## Apply pending database migrations with sqlx-cli
 	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' $(SQLX) migrate run --source $(SQLX_MIGRATIONS_DIR)

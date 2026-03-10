@@ -45,6 +45,32 @@ This starts local infrastructure dependencies only:
 
 - PostgreSQL `18.3` on `127.0.0.1:5432`
 - Redis `8.6.1` on `127.0.0.1:6379`
+- DBHub MCP server on `http://127.0.0.1:1000/mcp`
+
+## Project MCP configuration
+
+This repository checks in project-level DBHub MCP configuration for common AI coding clients:
+
+- `.codex/config.toml` for Codex CLI and Codex IDE extension
+- `.mcp.json` for Claude Code
+- `.cursor/mcp.json` for Cursor workspace MCP
+- `.vscode/mcp.json` for VS Code workspace MCP
+
+All project-level configurations point to `http://localhost:1000/mcp`.
+
+Codex loads `.codex/config.toml` only for trusted projects.
+
+On this machine, `codex-cli 0.112.0` does not auto-load the project-level MCP config during `codex` or `codex exec`, even though the current official docs describe that workflow. For a stable repository-local entrypoint today, use:
+
+```bash
+make codex
+```
+
+That target delegates to `./scripts/codex-project.sh`, which injects the same DBHub server via:
+
+```bash
+codex -c 'mcp_servers.dbhub.url="http://localhost:1000/mcp"'
+```
 
 ## Run the API server locally
 
@@ -76,6 +102,7 @@ This builds and starts the full Docker Compose stack:
 
 - PostgreSQL
 - Redis
+- `dbhub`
 - `ordering-food-server`
 - `autoheal` for unhealthy container restarts
 
