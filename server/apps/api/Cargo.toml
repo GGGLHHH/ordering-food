@@ -1,0 +1,42 @@
+[package]
+name = "ordering-food-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "ordering-food-server"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+config.workspace = true
+dotenvy.workspace = true
+ordering-food-identity-application = { path = "../../crates/identity-application" }
+ordering-food-identity-domain = { path = "../../crates/identity-domain" }
+ordering-food-identity-infrastructure-sqlx = { path = "../../crates/identity-infrastructure-sqlx" }
+ordering-food-bootstrap-core = { path = "../../crates/bootstrap-core" }
+ordering-food-shared-kernel = { path = "../../crates/shared-kernel" }
+redis.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+serde_urlencoded.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-error.workspace = true
+tracing-subscriber.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true

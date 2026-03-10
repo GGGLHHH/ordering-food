@@ -4,12 +4,12 @@ default_job = "server"
 env.CARGO_TERM_COLOR = "always"
 
 [jobs.server]
-command = ["cargo", "run"]
+command = ["cargo", "run", "-p", "ordering-food-api", "--bin", "ordering-food-server"]
 need_stdout = true
 allow_warnings = true
 background = false
 on_change_strategy = "kill_then_restart"
-watch = ["migrations", "Cargo.toml", "Cargo.lock"]
+watch = ["apps", "crates", "Cargo.toml", "Cargo.lock"]
 
 [keybindings]
 r = "job:server"

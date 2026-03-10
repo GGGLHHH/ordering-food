@@ -364,6 +364,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "deranged"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
+dependencies = [
+ "powerfmt",
+ "serde_core",
+]
+
+[[package]]
 name = "derive_arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1099,6 +1109,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-conv"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf97ec579c3c42f953ef76dbf8d55ac91fb219dde70e49aa4a6b7d74e9919050"
+
+[[package]]
 name = "num-integer"
 version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1145,7 +1161,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordering-food-server"
+name = "ordering-food-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1153,6 +1169,11 @@ dependencies = [
  "axum",
  "config",
  "dotenvy",
+ "ordering-food-bootstrap-core",
+ "ordering-food-identity-application",
+ "ordering-food-identity-domain",
+ "ordering-food-identity-infrastructure-sqlx",
+ "ordering-food-shared-kernel",
  "redis",
  "serde",
  "serde_json",
@@ -1160,6 +1181,7 @@ dependencies = [
  "serde_urlencoded",
  "sqlx",
  "thiserror",
+ "time",
  "tokio",
  "tower",
  "tower-http",
@@ -1168,6 +1190,56 @@ dependencies = [
  "tracing-subscriber",
  "utoipa",
  "utoipa-swagger-ui",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-bootstrap-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-identity-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-identity-domain",
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-identity-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-identity-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-identity-application",
+ "ordering-food-identity-domain",
+ "ordering-food-shared-kernel",
+ "sqlx",
+]
+
+[[package]]
+name = "ordering-food-shared-kernel"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "time",
 ]
 
 [[package]]
@@ -1316,6 +1388,12 @@ checksum = "b73949432f5e2a09657003c25bca5e19a0e9c84f8058ca374f49e0ebe605af77"
 dependencies = [
  "zerovec",
 ]
+
+[[package]]
+name = "powerfmt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppv-lite86"
@@ -1862,6 +1940,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "thiserror",
+ "time",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -1945,6 +2024,7 @@ dependencies = [
  "sqlx-core",
  "stringprep",
  "thiserror",
+ "time",
  "tracing",
  "whoami",
 ]
@@ -1982,6 +2062,7 @@ dependencies = [
  "sqlx-core",
  "stringprep",
  "thiserror",
+ "time",
  "tracing",
  "whoami",
 ]
@@ -2006,6 +2087,7 @@ dependencies = [
  "serde_urlencoded",
  "sqlx-core",
  "thiserror",
+ "time",
  "tracing",
  "url",
 ]
@@ -2088,6 +2170,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60246a4944f24f6e018aa17cdeffb7818b76356965d03b07d6a9886e8962185"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "time"
+version = "0.3.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "743bd48c283afc0388f9b8827b976905fb217ad9e647fae3a379a9283c4def2c"
+dependencies = [
+ "deranged",
+ "itoa",
+ "num-conv",
+ "powerfmt",
+ "serde_core",
+ "time-core",
+ "time-macros",
+]
+
+[[package]]
+name = "time-core"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7694e1cfe791f8d31026952abf09c69ca6f6fa4e1a1229e18988f06a04a12dca"
+
+[[package]]
+name = "time-macros"
+version = "0.2.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e70e4c5a0e0a8a4823ad65dfe1a6930e4f4d756dcd9dd7939022b5e8c501215"
+dependencies = [
+ "num-conv",
+ "time-core",
 ]
 
 [[package]]
@@ -2461,6 +2574,7 @@ checksum = "a68d3c8f01c0cfa54a75291d83601161799e4a89a39e0929f4b0354d88757a37"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 

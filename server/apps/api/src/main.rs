@@ -1,4 +1,4 @@
-use ordering_food_server::{
+use ordering_food_api::{
     app::run,
     observability::{format_anyhow_chain, init_tracing, install_panic_hook},
 };

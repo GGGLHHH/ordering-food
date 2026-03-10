@@ -3,10 +3,10 @@ FROM rust:1.94.0-bookworm AS builder
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
-COPY src ./src
-COPY migrations ./migrations
+COPY apps ./apps
+COPY crates ./crates
 
-RUN cargo build --release --locked --bin ordering-food-server
+RUN cargo build --release --locked -p ordering-food-api --bin ordering-food-server
 
 FROM debian:bookworm-slim AS runtime
 

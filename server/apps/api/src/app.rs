@@ -1,6 +1,7 @@
 use crate::{
+    composition::{self, contribution::ApiRouteMount, platform::ApiPlatform},
     config::Settings,
-    readiness::{ReadinessProbe, RuntimeReadiness},
+    readiness::ReadinessProbe,
     routes,
 };
 use anyhow::{Context, Result, anyhow, ensure};
@@ -17,7 +18,8 @@ use tower_http::{
     request_id::{MakeRequestUuid, RequestId},
     trace::TraceLayer,
 };
-use tracing::{Span, field, info, info_span, warn};
+use tracing::{Span, error, field, info, info_span, warn};
+use utoipa::openapi::OpenApi as OpenApiDocument;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -32,32 +34,48 @@ impl AppState {
 
 pub async fn run() -> Result<()> {
     let settings = Settings::from_env()?;
-
     let pg_pool = connect_postgres(&settings).await?;
-
-    if settings.app.auto_migrate {
-        sqlx::migrate!("./migrations")
-            .run(&pg_pool)
-            .await
-            .context("failed to run database migrations")?;
-    }
-
     let redis_client = connect_redis(&settings).await?;
-
-    let readiness = Arc::new(RuntimeReadiness::new(pg_pool, redis_client));
-    let app = build_router(AppState::new(readiness), &settings)?;
+    let platform = ApiPlatform::new(settings.clone(), pg_pool, redis_client);
+    let runtime = composition::prepare_runtime(platform).await?;
+    let run_parts = runtime.into_run_parts();
+    let app = build_router_with_contributions(
+        AppState::new(run_parts.readiness.clone()),
+        &settings,
+        run_parts.route_mounts,
+        run_parts.openapi_documents,
+    )?;
     let listener = tokio::net::TcpListener::bind(settings.app.bind_address())
         .await
         .with_context(|| format!("failed to bind {}", settings.app.bind_address()))?;
 
     info!(address = %settings.app.bind_address(), "server listening");
 
-    axum::serve(listener, app)
+    let lifecycle = run_parts.lifecycle;
+    let keepalive = run_parts.keepalive;
+    let serve_result = axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            if let Err(error_value) = lifecycle.shutdown().await {
+                error!(error = %error_value, "application shutdown failed");
+            }
+        })
         .await
-        .context("server stopped unexpectedly")
+        .context("server stopped unexpectedly");
+    drop(keepalive);
+    serve_result
 }
 
 pub fn build_router(state: AppState, settings: &Settings) -> Result<Router> {
+    build_router_with_contributions(state, settings, Vec::new(), Vec::new())
+}
+
+fn build_router_with_contributions(
+    state: AppState,
+    settings: &Settings,
+    route_mounts: Vec<ApiRouteMount>,
+    openapi_documents: Vec<OpenApiDocument>,
+) -> Result<Router> {
     let request_id_header = HeaderName::from_static("x-request-id");
     let cors_layer = build_cors_layer(settings)?;
     let trace_layer = TraceLayer::new_for_http()
@@ -102,7 +120,8 @@ pub fn build_router(state: AppState, settings: &Settings) -> Result<Router> {
         })
         .on_failure(());
 
-    Ok(routes::router(state)
+    Ok(routes::router(route_mounts, openapi_documents)
+        .with_state(state)
         .layer(cors_layer)
         .layer(tower_http::request_id::PropagateRequestIdLayer::new(
             request_id_header.clone(),
@@ -179,6 +198,29 @@ fn build_cors_layer(settings: &Settings) -> Result<CorsLayer> {
     Ok(cors_layer)
 }
 
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl-c signal")
+    };
+
+    #[cfg(unix)]
+    {
+        let mut terminate =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("failed to listen for terminate signal");
+        tokio::select! {
+            _ = ctrl_c => {},
+            _ = terminate.recv() => {},
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await;
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,10 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn live_endpoint_returns_success() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -285,10 +324,7 @@ mod tests {
 
     #[tokio::test]
     async fn ready_endpoint_returns_success_when_dependencies_are_ready() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -311,10 +347,7 @@ mod tests {
 
     #[tokio::test]
     async fn fallback_returns_not_found_envelope() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -337,10 +370,7 @@ mod tests {
 
     #[tokio::test]
     async fn health_router_returns_method_not_allowed_envelope() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -363,10 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_json_syntax_returns_bad_request() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -392,10 +419,7 @@ mod tests {
 
     #[tokio::test]
     async fn json_type_mismatch_returns_validation_error() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -419,10 +443,7 @@ mod tests {
 
     #[tokio::test]
     async fn query_parse_failure_returns_bad_request() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -444,10 +465,7 @@ mod tests {
 
     #[tokio::test]
     async fn path_parse_failure_returns_bad_request() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -471,10 +489,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_json_content_type_returns_unsupported_media_type() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -495,10 +510,7 @@ mod tests {
 
     #[tokio::test]
     async fn oversized_json_body_returns_payload_too_large() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
         let large_name = "a".repeat(1024 * 1024);
         let payload = format!(r#"{{"name":"{large_name}","quantity":1}}"#);
 
@@ -522,10 +534,7 @@ mod tests {
 
     #[tokio::test]
     async fn openapi_endpoint_returns_json_document_with_error_schemas() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -551,10 +560,7 @@ mod tests {
 
     #[tokio::test]
     async fn old_api_v1_path_returns_not_found() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(
@@ -577,10 +583,7 @@ mod tests {
 
     #[tokio::test]
     async fn docs_endpoint_is_accessible() {
-        let app = build_test_app(Ok(DependencyChecks {
-            postgres: "ok".to_string(),
-            redis: "ok".to_string(),
-        }));
+        let app = build_test_app(Ok(DependencyChecks::ok("ok", "ok")));
 
         let response = app
             .oneshot(Request::builder().uri("/docs").body(Body::empty()).unwrap())
