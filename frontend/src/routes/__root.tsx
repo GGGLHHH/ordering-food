@@ -8,7 +8,7 @@ import Header from '../components/Header'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
 import StoreDevtools from '../lib/demo-store-devtools'
-import appCss from '../styles.css?url'
+import '../styles.css'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -28,12 +28,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         title: 'TanStack Start Starter',
-      },
-    ],
-    links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
       },
     ],
   }),
