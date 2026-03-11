@@ -6,6 +6,16 @@
       "sourceType": "github",
       "computedHash": "6935586ef3ab02e18747a4477d396e692bc96e8f28b0d95b374ffc37fce74cda"
     },
+    "axum": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "961901d116a11563186fd1fd78c859dd2052dedb7e778bb82bce5af8aaf11523"
+    },
+    "cargo-nextest": {
+      "source": "laurigates/claude-plugins",
+      "sourceType": "github",
+      "computedHash": "634bc789fd4a7a74937f912dcf58397e57e5392c6a1f4fbf92df9b2f81219e79"
+    },
     "dbhub": {
       "source": "bytebase/dbhub",
       "sourceType": "github",
@@ -21,10 +31,20 @@
       "sourceType": "github",
       "computedHash": "9ca74258f51ef1f8f8327b9ba1edf77e0da17d10e9ab506b08a6cab32a2f5aa2"
     },
+    "rust-async-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "1e68b5edfa95069e54af75acf2a34634a5d0266021fa4af3b9706eaec5b6207e"
+    },
     "shadcn": {
       "source": "GGGLHHH/skills",
       "sourceType": "github",
       "computedHash": "df80e3412aff2065634dc9a06eed69b7a762007909a0794e5e9843c11de6ce69"
+    },
+    "sqlx-postgres": {
+      "source": "daiki48/dotfiles",
+      "sourceType": "github",
+      "computedHash": "e1bf94aee4e94e204365fc250ec43cee54a624e979da6bb006b25f13f6220637"
     },
     "tailwindcss": {
       "source": "GGGLHHH/skills",
@@ -35,6 +55,11 @@
       "source": "GGGLHHH/skills",
       "sourceType": "github",
       "computedHash": "7f798c0e3bd923c023b507aa4fcc0f967fc3467a646b389419e610840c52b5ac"
+    },
+    "utoipa-axum": {
+      "source": "suryavirkapur/skills",
+      "sourceType": "github",
+      "computedHash": "44e20b6a307d85569eb5808fdf94bd87e2b2734437af301b72441023fdcb0431"
     },
     "vite": {
       "source": "GGGLHHH/skills",
