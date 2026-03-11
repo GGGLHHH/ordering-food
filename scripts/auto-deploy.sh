@@ -9,6 +9,7 @@ REMOTE="${REMOTE:-origin}"
 CURRENT_BRANCH="$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
 BRANCH="${BRANCH:-${CURRENT_BRANCH}}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
+NO_CACHE="${NO_CACHE:-0}"
 COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-${REPO_DIR}/compose.prod.yml}"
 AUTO_DEPLOY_DIR="${AUTO_DEPLOY_DIR:-${REPO_DIR}/.git/auto-deploy}"
 STATE_FILE="${STATE_FILE:-${AUTO_DEPLOY_DIR}/state}"
@@ -76,6 +77,11 @@ ensure_repo_ready() {
   case "${HEALTH_TIMEOUT}" in
     ''|*[!0-9]*) fail "HEALTH_TIMEOUT must be an integer number of seconds" ;;
   esac
+
+  case "${NO_CACHE}" in
+    0|1) ;;
+    *) fail "NO_CACHE must be 0 or 1" ;;
+  esac
 }
 
 is_worktree_clean() {
@@ -118,6 +124,7 @@ checkout_target_branch() {
 deploy_target() {
   local target_commit="$1"
   local previous_commit="$2"
+  local build_args=()
 
   if ! is_worktree_clean; then
     log "Worktree is dirty, skipping deploy to avoid overwriting local changes"
@@ -128,10 +135,14 @@ deploy_target() {
     checkout_target_branch
   fi
 
+  if [ "${NO_CACHE}" = "1" ]; then
+    build_args+=(--no-cache)
+  fi
+
   log "Deploying ${previous_commit} -> ${target_commit}"
   (
     cd "${REPO_DIR}"
-    docker compose -f "${COMPOSE_FILE_PATH}" build --no-cache "${DEPLOY_SERVICES[@]}"
+    docker compose -f "${COMPOSE_FILE_PATH}" build "${build_args[@]}" "${DEPLOY_SERVICES[@]}"
     docker compose -f "${COMPOSE_FILE_PATH}" up -d --no-build --wait --wait-timeout "${HEALTH_TIMEOUT}" "${DEPLOY_SERVICES[@]}"
   )
   write_state "${target_commit}"
