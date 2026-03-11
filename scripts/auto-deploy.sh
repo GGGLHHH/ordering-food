@@ -9,6 +9,7 @@ REMOTE="${REMOTE:-origin}"
 CURRENT_BRANCH="$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
 BRANCH="${BRANCH:-${CURRENT_BRANCH}}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
+COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-${REPO_DIR}/compose.prod.yml}"
 AUTO_DEPLOY_DIR="${AUTO_DEPLOY_DIR:-${REPO_DIR}/.git/auto-deploy}"
 STATE_FILE="${STATE_FILE:-${AUTO_DEPLOY_DIR}/state}"
 LOCK_DIR="${LOCK_DIR:-${AUTO_DEPLOY_DIR}/lock}"
@@ -66,7 +67,7 @@ ensure_repo_ready() {
   require_command docker
 
   [ -d "${REPO_DIR}/.git" ] || fail "REPO_DIR is not a git repository: ${REPO_DIR}"
-  [ -f "${REPO_DIR}/compose.yml" ] || fail "compose.yml not found under ${REPO_DIR}"
+  [ -f "${COMPOSE_FILE_PATH}" ] || fail "Compose file not found: ${COMPOSE_FILE_PATH}"
 
   if ! git -C "${REPO_DIR}" remote get-url "${REMOTE}" >/dev/null 2>&1; then
     fail "Git remote '${REMOTE}' not found in ${REPO_DIR}"
@@ -130,8 +131,8 @@ deploy_target() {
   log "Deploying ${previous_commit} -> ${target_commit}"
   (
     cd "${REPO_DIR}"
-    docker compose build --no-cache "${DEPLOY_SERVICES[@]}"
-    docker compose up -d --no-build --wait --wait-timeout "${HEALTH_TIMEOUT}" "${DEPLOY_SERVICES[@]}"
+    docker compose -f "${COMPOSE_FILE_PATH}" build --no-cache "${DEPLOY_SERVICES[@]}"
+    docker compose -f "${COMPOSE_FILE_PATH}" up -d --no-build --wait --wait-timeout "${HEALTH_TIMEOUT}" "${DEPLOY_SERVICES[@]}"
   )
   write_state "${target_commit}"
   log "Deploy completed for commit ${target_commit}"

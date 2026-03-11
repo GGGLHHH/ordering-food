@@ -1,3 +1,5 @@
 server/target/
 .DS_Store
 .gitnexus
+data/
+data/*

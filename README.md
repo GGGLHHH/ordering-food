@@ -123,8 +123,8 @@ REPO_DIR=$(pwd) BRANCH=main ./scripts/auto-deploy.sh
 The script fetches `origin/<branch>`, compares the remote commit with the last successful deployment, and only runs deployment when an update is detected. Deployment is fixed to these two Compose commands:
 
 ```bash
-docker compose build --no-cache server frontend nginx
-docker compose up -d --no-build --wait --wait-timeout 180 server frontend nginx
+docker compose -f compose.prod.yml build --no-cache server frontend nginx
+docker compose -f compose.prod.yml up -d --no-build --wait --wait-timeout 180 server frontend nginx
 ```
 
 Useful environment variables:
@@ -132,11 +132,12 @@ Useful environment variables:
 - `REMOTE` for a non-default Git remote
 - `BRANCH` for the deployment branch
 - `HEALTH_TIMEOUT` to control `docker compose up --wait-timeout`
+- `COMPOSE_FILE_PATH` to override the Compose file path, defaulting to `compose.prod.yml`
 - `AUTO_DEPLOY_DIR` to override the default state and lock directory under `.git/auto-deploy`
 - `STATE_FILE` to override the recorded deployed commit path
 - `LOCK_DIR` to override the lock directory path
 
-The script uses an atomic lock directory to prevent concurrent runs, cleans up stale locks automatically, stores its own bookkeeping under `.git/auto-deploy` by default so the working tree stays clean, and skips deployment when the working tree is dirty to avoid clobbering server-side edits accidentally. Schedule it at your preferred interval in 1Panel instead of letting the script sleep in a loop.
+The script uses an atomic lock directory to prevent concurrent runs, cleans up stale locks automatically, stores its own bookkeeping under `.git/auto-deploy` by default so the working tree stays clean, and skips deployment when the working tree is dirty to avoid clobbering server-side edits accidentally. Schedule it at your preferred interval in 1Panel instead of letting the script sleep in a loop. The production Compose file only publishes Nginx on `127.0.0.1:18081` by default.
 
 ## Manage database migrations
 
