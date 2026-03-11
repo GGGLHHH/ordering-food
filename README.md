@@ -132,9 +132,11 @@ Useful environment variables:
 - `REMOTE` for a non-default Git remote
 - `BRANCH` for the deployment branch
 - `HEALTH_TIMEOUT` to control `docker compose up --wait-timeout`
+- `AUTO_DEPLOY_DIR` to override the default state and lock directory under `.git/auto-deploy`
+- `STATE_FILE` to override the recorded deployed commit path
 - `LOCK_DIR` to override the lock directory path
 
-The script uses an atomic lock directory to prevent concurrent runs, cleans up stale locks automatically, and skips deployment when the working tree is dirty to avoid clobbering server-side edits accidentally. Schedule it at your preferred interval in 1Panel instead of letting the script sleep in a loop.
+The script uses an atomic lock directory to prevent concurrent runs, cleans up stale locks automatically, stores its own bookkeeping under `.git/auto-deploy` by default so the working tree stays clean, and skips deployment when the working tree is dirty to avoid clobbering server-side edits accidentally. Schedule it at your preferred interval in 1Panel instead of letting the script sleep in a loop.
 
 ## Manage database migrations
 

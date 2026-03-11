@@ -9,8 +9,9 @@ REMOTE="${REMOTE:-origin}"
 CURRENT_BRANCH="$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
 BRANCH="${BRANCH:-${CURRENT_BRANCH}}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
-STATE_FILE="${STATE_FILE:-${REPO_DIR}/.auto-deploy-state}"
-LOCK_DIR="${LOCK_DIR:-${REPO_DIR}/.auto-deploy.lock}"
+AUTO_DEPLOY_DIR="${AUTO_DEPLOY_DIR:-${REPO_DIR}/.git/auto-deploy}"
+STATE_FILE="${STATE_FILE:-${AUTO_DEPLOY_DIR}/state}"
+LOCK_DIR="${LOCK_DIR:-${AUTO_DEPLOY_DIR}/lock}"
 DEPLOY_SERVICES=(server frontend nginx)
 
 log() {
@@ -35,6 +36,8 @@ release_lock() {
 
 acquire_lock() {
   local lock_pid=''
+
+  mkdir -p "$(dirname "${LOCK_DIR}")"
 
   if mkdir "${LOCK_DIR}" 2>/dev/null; then
     printf '%s\n' "$$" > "${LOCK_DIR}/pid"
@@ -97,6 +100,7 @@ read_state() {
 }
 
 write_state() {
+  mkdir -p "$(dirname "${STATE_FILE}")"
   printf '%s\n' "$1" > "${STATE_FILE}"
 }
 
