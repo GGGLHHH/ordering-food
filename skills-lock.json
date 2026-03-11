@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "antfu": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "6935586ef3ab02e18747a4477d396e692bc96e8f28b0d95b374ffc37fce74cda"
+    },
     "dbhub": {
       "source": "bytebase/dbhub",
       "sourceType": "github",
@@ -14,27 +19,32 @@
     "react": {
       "source": "GGGLHHH/skills",
       "sourceType": "github",
-      "computedHash": "d9de6cdfc7704d0ce76e0e5383381f8da66745d3a95835278de1b69a39aad7d4"
+      "computedHash": "9ca74258f51ef1f8f8327b9ba1edf77e0da17d10e9ab506b08a6cab32a2f5aa2"
     },
     "shadcn": {
       "source": "GGGLHHH/skills",
       "sourceType": "github",
-      "computedHash": "7740f3fca237cf6dc1ad3a7f60f61f6b03a6c8c53edd251e4bdfe4946df6fa75"
+      "computedHash": "df80e3412aff2065634dc9a06eed69b7a762007909a0794e5e9843c11de6ce69"
     },
     "tailwindcss": {
       "source": "GGGLHHH/skills",
       "sourceType": "github",
       "computedHash": "9b654cb52ef4a3f8d57cc5e9c64792cf6b5304e08625321c90d0641f5a20dfbe"
     },
+    "unocss": {
+      "source": "GGGLHHH/skills",
+      "sourceType": "github",
+      "computedHash": "7f798c0e3bd923c023b507aa4fcc0f967fc3467a646b389419e610840c52b5ac"
+    },
     "vite": {
       "source": "GGGLHHH/skills",
       "sourceType": "github",
-      "computedHash": "0293c251e4d6ff4818e8d2faed2a92f98d8d73c2f4819bd754faf93ca134d6fe"
+      "computedHash": "be1ed40988b47f141ec045be7cc10d967cee6c4035f878617e7f7f26814c8a05"
     },
     "vitest": {
       "source": "GGGLHHH/skills",
       "sourceType": "github",
-      "computedHash": "669c7275f7e1379b06b2bcfa593603aead4c983b951c7e8edbc09640aa38d0a1"
+      "computedHash": "44b64cc26f3d574f5a5ff27560e37e15587db4680540cd8fe190f1b2d54c63b2"
     }
   }
 }

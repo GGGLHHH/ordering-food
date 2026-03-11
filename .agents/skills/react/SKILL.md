@@ -4,7 +4,7 @@ description: React 19.2 component model, hooks, Actions/forms, concurrent render
 metadata:
   author: Anthony Fu
   version: "2026.2.13"
-  source: Generated from https://github.com/reactjs/react.dev, scripts located at https://github.com/antfu/skills
+  source: Generated from https://github.com/reactjs/react.dev, scripts located at https://github.com/GGGLHHH/skills
 ---
 
 # React

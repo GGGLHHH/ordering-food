@@ -3,13 +3,13 @@ name: vite
 description: Vite build tool configuration, plugin API, SSR, and Vite 8 Rolldown migration. Use when working with Vite projects, vite.config.ts, Vite plugins, or building libraries/SSR apps with Vite.
 metadata:
   author: Anthony Fu
-  version: "2026.1.31"
-  source: Generated from https://github.com/vitejs/vite, scripts at https://github.com/antfu/skills
+  version: "2026.3.10"
+  source: Generated from https://github.com/vitejs/vite, scripts at https://github.com/GGGLHHH/skills
 ---
 
 # Vite
 
-> Based on Vite 8 beta (Rolldown-powered). Vite 8 uses Rolldown bundler and Oxc transformer.
+> Based on Vite 8.0.0-beta.18 (Rolldown-powered), generated at 2026-03-10. Vite 8 uses Rolldown bundler and Oxc transformer.
 
 Vite is a next-generation frontend build tool with fast dev server (native ESM + HMR) and optimized production builds.
 
