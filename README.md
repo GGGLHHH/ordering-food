@@ -111,6 +111,33 @@ This builds and starts the full Docker Compose stack:
 - `ordering-food-nginx`
 - `autoheal` for unhealthy container restarts
 
+## Server auto deploy loop
+
+Run the polling deploy script on a server clone when you want the host to pull and redeploy automatically after remote updates:
+
+```bash
+chmod +x scripts/auto-deploy.sh
+REPO_DIR=$(pwd) BRANCH=main POLL_INTERVAL=60 ./scripts/auto-deploy.sh
+```
+
+The script fetches `origin/<branch>`, deploys only when the remote commit differs from the last successful deployment, and then waits for the runtime containers to become healthy. By default it runs:
+
+```bash
+docker compose up -d --build server frontend nginx
+```
+
+Useful environment variables:
+
+- `REMOTE` for a non-default Git remote
+- `BRANCH` for the deployment branch
+- `POLL_INTERVAL` for the polling interval in seconds
+- `DEPLOY_COMMAND` to override the deployment command
+- `HEALTH_CONTAINERS` to change health checks, or set it to an empty string to disable them
+- `HEALTH_TIMEOUT` to control the health wait timeout
+- `RUN_ONCE=1` to execute a single fetch/deploy cycle
+
+The script skips deployment when the working tree is dirty, which avoids clobbering server-side edits accidentally.
+
 ## Manage database migrations
 
 ```bash
