@@ -1,16 +1,14 @@
 {
-  "rust-analyzer.linkedProjects": ["server/Cargo.toml"],
   "files.watcherExclude": {
-    "**/frontend/src/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true
   },
   "search.exclude": {
-    "**/frontend/src/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true
   },
   "files.readonlyInclude": {
-    "**/frontend/src/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true
   },
   "biome.requireConfiguration": true,
-  "biome.configurationPath": "frontend/biome.json",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.biome": "explicit",
@@ -37,5 +35,5 @@
   "[css]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "biome.lsp.bin": "frontend/node_modules/.bin/biome"
+  "biome.lsp.bin": "node_modules/.bin/biome"
 }
