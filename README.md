@@ -107,6 +107,7 @@ This builds and starts the full Docker Compose stack:
 - Redis
 - `dbhub`
 - `ordering-food-server`
+- `ordering-food-frontend`
 - `autoheal` for unhealthy container restarts
 
 ## Manage database migrations
@@ -126,7 +127,9 @@ These commands invoke `cargo sqlx migrate ...` inside `/server`, with the source
 docker build -f server/Dockerfile -t ordering-food-server:local server
 ```
 
-The runtime image defaults to `APP__HOST=0.0.0.0` and `APP__PORT=8080`. If you pass the root `.env` file into the container, override `APP__HOST` back to `0.0.0.0`, otherwise the server will only bind to the container loopback interface.
+The server runtime image defaults to `APP__HOST=0.0.0.0` and `APP__PORT=8080`. If you pass the root `.env` file into the container, override `APP__HOST` back to `0.0.0.0`, otherwise the server will only bind to the container loopback interface.
+
+The frontend container builds the TanStack Start app and runs the Nitro node server on port `3000`.
 
 ## Available endpoints
 
