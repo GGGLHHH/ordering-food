@@ -7,7 +7,6 @@ import Header from '../components/Header'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
-import StoreDevtools from '../lib/demo-store-devtools'
 import '../styles.css'
 
 interface MyRouterContext {
@@ -27,7 +26,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'Ordering Food',
       },
     ],
   }),
@@ -56,7 +55,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 render: <TanStackRouterDevtoolsPanel />,
               },
               TanStackQueryDevtools,
-              StoreDevtools,
             ]}
           />
         </TanStackQueryProvider>
