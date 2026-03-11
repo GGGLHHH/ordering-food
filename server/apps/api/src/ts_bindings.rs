@@ -161,9 +161,9 @@ mod tests {
     #[test]
     fn configured_output_dir_uses_env_var_value() {
         let output_dir =
-            resolve_output_dir(Some("../frontend/src/generated/api".to_string())).unwrap();
+            resolve_output_dir(Some("../frontend/src/api/generated".to_string())).unwrap();
 
-        assert_eq!(output_dir, PathBuf::from("../frontend/src/generated/api"));
+        assert_eq!(output_dir, PathBuf::from("../frontend/src/api/generated"));
     }
 
     #[test]

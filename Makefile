@@ -36,7 +36,7 @@ run: ## Run the Rust API with Bacon auto-reload
 dev: up run ## Start dependencies and enter the Bacon hot-reload loop
 
 export-ts: ## Export frontend TypeScript bindings from API contracts
-	@test -n "$(GENERATED_API_DIR)" || (echo "GENERATED_API_DIR is required, e.g. GENERATED_API_DIR=../frontend/src/generated/api" && exit 1)
+	@test -n "$(GENERATED_API_DIR)" || (echo "GENERATED_API_DIR is required, e.g. GENERATED_API_DIR=../frontend/src/api/generated" && exit 1)
 	cd $(SERVER_DIR) && GENERATED_API_DIR='$(GENERATED_API_DIR)' cargo run -p ordering-food-api --bin export-ts-bindings
 
 migration-up: ## Apply pending database migrations with sqlx-cli

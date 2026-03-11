@@ -155,7 +155,7 @@ The repository uses `ts-rs` from the API contract layer as the single source of 
 - Future business endpoints should define frontend-facing DTOs in `apps/api` and map them to application/domain models explicitly
 - The `identity` endpoints already follow this pattern and export their request/response contracts via `ts-rs`
 
-Set `GENERATED_API_DIR` before exporting bindings. The checked-in root `.env` uses the default local path `../frontend/src/generated/api`, and `make export-ts` forwards that environment variable into the export binary.
+Set `GENERATED_API_DIR` before exporting bindings. The checked-in root `.env` uses the default local path `../frontend/src/api/generated`, and `make export-ts` forwards that environment variable into the export binary.
 
 Generate bindings with:
 
@@ -166,7 +166,7 @@ make export-ts
 If you run the binary directly, pass the environment variable explicitly:
 
 ```bash
-cd server && GENERATED_API_DIR=../frontend/src/generated/api cargo run -p ordering-food-api --bin export-ts-bindings
+cd server && GENERATED_API_DIR=../frontend/src/api/generated cargo run -p ordering-food-api --bin export-ts-bindings
 ```
 
 ## Configuration
