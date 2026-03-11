@@ -53,8 +53,8 @@ services:
       REDIS__URL: redis://redis:6379
     labels:
       autoheal: "true"
-    ports:
-      - "${APP__PORT:-8080}:${APP__PORT:-8080}"
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health/ready"]
       interval: 10s
@@ -76,8 +76,8 @@ services:
       NITRO_PORT: 3000
     labels:
       autoheal: "true"
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     healthcheck:
       test:
         [
@@ -90,6 +90,28 @@ services:
       timeout: 3s
       retries: 5
       start_period: 20s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ordering-food-nginx
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    labels:
+      autoheal: "true"
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   dbhub:
     image: bytebase/dbhub

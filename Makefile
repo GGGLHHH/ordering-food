@@ -6,7 +6,7 @@ ROOT_ENV_FILE := .env
 SQLX := cargo sqlx
 SQLX_MIGRATIONS_DIR := crates/identity-infrastructure-sqlx/migrations
 INFRA_SERVICES := postgres redis dbhub
-FULL_STACK_SERVICES := $(INFRA_SERVICES) server frontend autoheal
+FULL_STACK_SERVICES := $(INFRA_SERVICES) server frontend nginx autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
 GENERATED_API_DIR ?= $(shell awk -F= '/^GENERATED_API_DIR=/{sub(/^GENERATED_API_DIR=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
