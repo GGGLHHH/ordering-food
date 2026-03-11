@@ -8,13 +8,10 @@ REPO_DIR="${REPO_DIR:-${DEFAULT_REPO_DIR}}"
 REMOTE="${REMOTE:-origin}"
 CURRENT_BRANCH="$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
 BRANCH="${BRANCH:-${CURRENT_BRANCH}}"
-POLL_INTERVAL="${POLL_INTERVAL:-60}"
-DEPLOY_COMMAND="${DEPLOY_COMMAND:-docker compose up -d --build server frontend nginx}"
-HEALTH_CONTAINERS="${HEALTH_CONTAINERS-ordering-food-server ordering-food-frontend ordering-food-nginx}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
-RUN_ONCE="${RUN_ONCE:-0}"
 STATE_FILE="${STATE_FILE:-${REPO_DIR}/.auto-deploy-state}"
-LOCK_FILE="${LOCK_FILE:-${REPO_DIR}/.auto-deploy.lock}"
+LOCK_DIR="${LOCK_DIR:-${REPO_DIR}/.auto-deploy.lock}"
+DEPLOY_SERVICES=(server frontend nginx)
 
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -30,15 +27,34 @@ require_command() {
   command -v "${command_name}" >/dev/null 2>&1 || fail "Missing required command: ${command_name}"
 }
 
-acquire_lock() {
-  exec 9>"${LOCK_FILE}"
+release_lock() {
+  if [ -d "${LOCK_DIR}" ]; then
+    rm -rf "${LOCK_DIR}"
+  fi
+}
 
-  if command -v flock >/dev/null 2>&1; then
-    flock -n 9 || fail "Another auto-deploy process is already running"
+acquire_lock() {
+  local lock_pid=''
+
+  if mkdir "${LOCK_DIR}" 2>/dev/null; then
+    printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+    trap release_lock EXIT INT TERM
     return
   fi
 
-  log "WARN: 'flock' not found, continuing without process lock"
+  if [ -f "${LOCK_DIR}/pid" ]; then
+    lock_pid="$(tr -d '[:space:]' < "${LOCK_DIR}/pid")"
+    if [ -n "${lock_pid}" ] && ! kill -0 "${lock_pid}" 2>/dev/null; then
+      log "Removing stale lock owned by pid ${lock_pid}"
+      rm -rf "${LOCK_DIR}"
+      mkdir "${LOCK_DIR}"
+      printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+      trap release_lock EXIT INT TERM
+      return
+    fi
+  fi
+
+  fail "Another auto-deploy process is already running"
 }
 
 ensure_repo_ready() {
@@ -52,10 +68,6 @@ ensure_repo_ready() {
   if ! git -C "${REPO_DIR}" remote get-url "${REMOTE}" >/dev/null 2>&1; then
     fail "Git remote '${REMOTE}' not found in ${REPO_DIR}"
   fi
-
-  case "${POLL_INTERVAL}" in
-    ''|*[!0-9]*) fail "POLL_INTERVAL must be an integer number of seconds" ;;
-  esac
 
   case "${HEALTH_TIMEOUT}" in
     ''|*[!0-9]*) fail "HEALTH_TIMEOUT must be an integer number of seconds" ;;
@@ -98,50 +110,6 @@ checkout_target_branch() {
   git -C "${REPO_DIR}" checkout --quiet -b "${BRANCH}" --track "${REMOTE}/${BRANCH}"
 }
 
-wait_for_health() {
-  if [ -z "${HEALTH_CONTAINERS}" ]; then
-    log "Skipping health checks because HEALTH_CONTAINERS is empty"
-    return 0
-  fi
-
-  local containers=()
-  local container_name=''
-  local status=''
-  local all_healthy=1
-  local deadline=$((SECONDS + HEALTH_TIMEOUT))
-
-  read -r -a containers <<< "${HEALTH_CONTAINERS}"
-
-  for container_name in "${containers[@]}"; do
-    docker inspect "${container_name}" >/dev/null 2>&1 || fail "Container not found after deploy: ${container_name}"
-  done
-
-  while [ "${SECONDS}" -lt "${deadline}" ]; do
-    all_healthy=1
-
-    for container_name in "${containers[@]}"; do
-      status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_name}" 2>/dev/null || echo missing)"
-
-      case "${status}" in
-        healthy|running) ;;
-        *)
-          all_healthy=0
-          log "Waiting for ${container_name} to become ready, current status: ${status}"
-          ;;
-      esac
-    done
-
-    if [ "${all_healthy}" -eq 1 ]; then
-      log "All containers are healthy: ${HEALTH_CONTAINERS}"
-      return 0
-    fi
-
-    sleep 5
-  done
-
-  fail "Timed out waiting for containers to become healthy"
-}
-
 deploy_target() {
   local target_commit="$1"
   local previous_commit="$2"
@@ -156,16 +124,24 @@ deploy_target() {
   fi
 
   log "Deploying ${previous_commit} -> ${target_commit}"
-  bash -lc "cd \"${REPO_DIR}\" && ${DEPLOY_COMMAND}"
-  wait_for_health
+  (
+    cd "${REPO_DIR}"
+    docker compose build --no-cache "${DEPLOY_SERVICES[@]}"
+    docker compose up -d --no-build --wait --wait-timeout "${HEALTH_TIMEOUT}" "${DEPLOY_SERVICES[@]}"
+  )
   write_state "${target_commit}"
   log "Deploy completed for commit ${target_commit}"
 }
 
-run_iteration() {
+main() {
   local deployed_commit=''
   local repo_commit=''
   local target_commit=''
+
+  acquire_lock
+  ensure_repo_ready
+
+  log "Checking ${REMOTE}/${BRANCH} in ${REPO_DIR}"
 
   fetch_remote
   target_commit="$(remote_commit)"
@@ -178,26 +154,7 @@ run_iteration() {
   fi
 
   deploy_target "${target_commit}" "${deployed_commit:-<none>}"
-}
-
-main() {
-  acquire_lock
-  ensure_repo_ready
-
-  log "Watching ${REMOTE}/${BRANCH} in ${REPO_DIR} every ${POLL_INTERVAL}s"
-
-  while true; do
-    if ! run_iteration; then
-      log "Iteration failed; will retry on the next cycle"
-    fi
-
-    if [ "${RUN_ONCE}" = '1' ]; then
-      log 'RUN_ONCE=1, exiting after a single iteration'
-      break
-    fi
-
-    sleep "${POLL_INTERVAL}"
-  done
+  log 'Single-run deploy check finished'
 }
 
 main "$@"

@@ -111,32 +111,30 @@ This builds and starts the full Docker Compose stack:
 - `ordering-food-nginx`
 - `autoheal` for unhealthy container restarts
 
-## Server auto deploy loop
+## Server auto deploy task
 
-Run the polling deploy script on a server clone when you want the host to pull and redeploy automatically after remote updates:
+Run the deploy script from a server-side scheduler such as 1Panel when you want each execution to check once, deploy once if needed, and then exit:
 
 ```bash
-chmod +x scripts/auto-deploy.sh
-REPO_DIR=$(pwd) BRANCH=main POLL_INTERVAL=60 ./scripts/auto-deploy.sh
+cd /path/to/ordering-food
+REPO_DIR=$(pwd) BRANCH=main ./scripts/auto-deploy.sh
 ```
 
-The script fetches `origin/<branch>`, deploys only when the remote commit differs from the last successful deployment, and then waits for the runtime containers to become healthy. By default it runs:
+The script fetches `origin/<branch>`, compares the remote commit with the last successful deployment, and only runs deployment when an update is detected. Deployment is fixed to these two Compose commands:
 
 ```bash
-docker compose up -d --build server frontend nginx
+docker compose build --no-cache server frontend nginx
+docker compose up -d --no-build --wait --wait-timeout 180 server frontend nginx
 ```
 
 Useful environment variables:
 
 - `REMOTE` for a non-default Git remote
 - `BRANCH` for the deployment branch
-- `POLL_INTERVAL` for the polling interval in seconds
-- `DEPLOY_COMMAND` to override the deployment command
-- `HEALTH_CONTAINERS` to change health checks, or set it to an empty string to disable them
-- `HEALTH_TIMEOUT` to control the health wait timeout
-- `RUN_ONCE=1` to execute a single fetch/deploy cycle
+- `HEALTH_TIMEOUT` to control `docker compose up --wait-timeout`
+- `LOCK_DIR` to override the lock directory path
 
-The script skips deployment when the working tree is dirty, which avoids clobbering server-side edits accidentally.
+The script uses an atomic lock directory to prevent concurrent runs, cleans up stale locks automatically, and skips deployment when the working tree is dirty to avoid clobbering server-side edits accidentally. Schedule it at your preferred interval in 1Panel instead of letting the script sleep in a loop.
 
 ## Manage database migrations
 
