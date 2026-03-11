@@ -132,7 +132,7 @@ The server runtime image defaults to `APP__HOST=0.0.0.0` and `APP__PORT=8080`. I
 
 The frontend container builds the TanStack Start app and runs the Nitro node server on port `3000`.
 
-The internal Nginx container listens on `127.0.0.1:8081` and is intended to sit behind an external host-level Nginx that terminates HTTPS. It proxies only `/api/*` to the Rust API, proxies `/health` to the frontend Nitro server, and sends all other requests to the frontend app. The Rust API and frontend Nitro services are no longer published directly to the host; external traffic should enter through Nginx only. Backend readiness/docs endpoints remain internal to the Compose network.
+The internal Nginx container listens on `127.0.0.1:18081` and is intended to sit behind an external host-level Nginx that terminates HTTPS. It proxies only `/api/*` to the Rust API, proxies `/health` to the frontend Nitro server, and sends all other requests to the frontend app. The Rust API and frontend Nitro services are no longer published directly to the host; external traffic should enter through Nginx only. Backend readiness/docs endpoints remain internal to the Compose network.
 
 ## Available endpoints
 
