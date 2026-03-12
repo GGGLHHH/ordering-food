@@ -211,12 +211,17 @@ The server automatically loads the root `.env` file on startup and then applies 
 - `APP__HOST`
 - `APP__PORT`
 - `APP__AUTO_MIGRATE`
+- `APP__LOG_LEVEL`
 - `APP__ALLOWED_ORIGINS`
 - `DATABASE__URL`
 - `DATABASE__MAX_CONNECTIONS`
 - `REDIS__URL`
 
 Default local development values live in the root `.env` file.
+
+`APP__LOG_LEVEL` supports `trace`, `debug`, `info`, `warn`, and `error`. When `RUST_LOG` is
+set, it still takes precedence as the most specific override. The production Compose file pins
+`APP__LOG_LEVEL=error` so the server only records error-level logs and above by default.
 
 Example override for one-off runs:
 

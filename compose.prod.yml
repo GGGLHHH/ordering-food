@@ -48,6 +48,7 @@ services:
     environment:
       APP__HOST: 0.0.0.0
       APP__AUTO_MIGRATE: "true"
+      APP__LOG_LEVEL: error
       DATABASE__URL: postgres://ordering_food:ordering_food@postgres:5432/ordering_food
       REDIS__URL: redis://redis:6379
     labels:
