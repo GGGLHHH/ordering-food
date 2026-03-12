@@ -1,0 +1,4 @@
+interface:
+  display_name: "Request Ordering Food API"
+  short_description: "Request and debug ordering-food REST API"
+  default_prompt: "Use $request-ordering-food-api to call or debug an ordering-food REST API endpoint."
