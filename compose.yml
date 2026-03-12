@@ -49,6 +49,7 @@ services:
       - .env
     environment:
       APP__HOST: 0.0.0.0
+      APP__AUTO_MIGRATE: "true"
       DATABASE__URL: postgres://ordering_food:ordering_food@postgres:5432/ordering_food
       REDIS__URL: redis://redis:6379
     labels:
@@ -145,4 +146,3 @@ services:
     depends_on:
       server:
         condition: service_started
-
