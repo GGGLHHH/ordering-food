@@ -37,6 +37,11 @@ impl DisableUser {
             }
         };
 
+        if user.status() == ordering_food_identity_domain::UserStatus::Disabled {
+            self.transaction_manager.rollback(tx).await?;
+            return Err(ApplicationError::conflict("user can no longer be disabled"));
+        }
+
         if let Err(error) = user.disable(self.clock.now()) {
             self.transaction_manager.rollback(tx).await?;
             return Err(error.into());
@@ -87,5 +92,50 @@ mod tests {
         let user = users.get("user-1").unwrap();
         assert_eq!(user.status(), UserStatus::Disabled);
         assert_eq!(*transactions.commit_count.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn disable_user_returns_conflict_when_user_is_already_disabled() {
+        let repository = Arc::new(FakeRepository::default());
+        repository.seed(
+            User::rehydrate(
+                UserId::new("user-1"),
+                UserStatus::Disabled,
+                UserProfile::new("Alice", None, None, None).unwrap(),
+                Vec::new(),
+                datetime!(2026-03-10 08:00 UTC),
+                datetime!(2026-03-10 08:30 UTC),
+                None,
+            )
+            .unwrap(),
+        );
+        let transactions = Arc::new(FakeTransactionManager::default());
+        let use_case = DisableUser::new(
+            repository.clone(),
+            transactions.clone(),
+            Arc::new(FakeClock {
+                now: datetime!(2026-03-10 09:00 UTC),
+            }),
+        );
+
+        let error = use_case
+            .execute(DisableUserInput {
+                user_id: "user-1".to_string(),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ApplicationError::Conflict { ref message }
+            if message == "user can no longer be disabled"
+        ));
+        assert_eq!(*transactions.rollback_count.lock().unwrap(), 1);
+        assert_eq!(*transactions.commit_count.lock().unwrap(), 0);
+
+        let users = repository.users();
+        let user = users.get("user-1").unwrap();
+        assert_eq!(user.status(), UserStatus::Disabled);
+        assert_eq!(user.updated_at(), datetime!(2026-03-10 08:30 UTC));
     }
 }

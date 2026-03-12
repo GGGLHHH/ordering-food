@@ -1,8 +1,10 @@
+mod credential_repository;
 mod module;
 mod transaction;
 mod user_read_repository;
 mod user_repository;
 
+pub use credential_repository::SqlxCredentialRepository;
 pub use module::build_identity_module;
 pub use transaction::SqlxTransactionManager;
 pub use user_read_repository::SqlxUserReadRepository;

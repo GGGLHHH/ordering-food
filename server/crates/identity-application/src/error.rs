@@ -9,6 +9,8 @@ pub enum ApplicationError {
     NotFound { message: String },
     #[error("conflict: {message}")]
     Conflict { message: String },
+    #[error("unauthorized: {message}")]
+    Unauthorized { message: String },
     #[error("unexpected: {message}")]
     Unexpected {
         message: String,
@@ -32,6 +34,12 @@ impl ApplicationError {
 
     pub fn conflict(message: impl Into<String>) -> Self {
         Self::Conflict {
+            message: message.into(),
+        }
+    }
+
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Self::Unauthorized {
             message: message.into(),
         }
     }

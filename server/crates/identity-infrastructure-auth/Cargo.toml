@@ -1,0 +1,17 @@
+[package]
+name = "ordering-food-identity-infrastructure-auth"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+argon2.workspace = true
+jsonwebtoken.workspace = true
+ordering-food-identity-application = { path = "../identity-application" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+redis.workspace = true
+serde.workspace = true
+tokio.workspace = true
+uuid.workspace = true

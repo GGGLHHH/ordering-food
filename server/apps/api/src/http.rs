@@ -7,8 +7,9 @@ use axum::{
     extract::{FromRequest, FromRequestParts, MatchedPath, Path, Query, Request},
     http::request::Parts,
 };
+use ordering_food_identity_application::TokenService;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::{convert::Infallible, error::Error as StdError, ops::Deref};
+use std::{convert::Infallible, error::Error as StdError, ops::Deref, sync::Arc};
 use tower_http::request_id::RequestId;
 use ts_rs::TS;
 use utoipa::ToSchema;
@@ -55,6 +56,65 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self::from_parts(parts))
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthenticatedUser {
+    pub user_id: String,
+}
+
+impl<S> FromRequestParts<S> for AuthenticatedUser
+where
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let context = RequestContext::from_parts(parts);
+
+        let token_service = parts
+            .extensions
+            .get::<Arc<dyn TokenService>>()
+            .ok_or_else(|| {
+                AppError::internal("token service not configured")
+                    .with_request_id(context.request_id.clone())
+            })?
+            .clone();
+
+        let cookie_header = parts
+            .headers
+            .get(axum::http::header::COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        let access_token = parse_cookie(cookie_header, "access_token").ok_or_else(|| {
+            AppError::unauthorized("missing access token")
+                .with_request_id(context.request_id.clone())
+        })?;
+
+        let claims = token_service
+            .verify_access_token(&access_token)
+            .map_err(|_| {
+                AppError::unauthorized("invalid or expired access token")
+                    .with_request_id(context.request_id.clone())
+            })?;
+
+        Ok(AuthenticatedUser {
+            user_id: claims.user_id,
+        })
+    }
+}
+
+fn parse_cookie(header: &str, name: &str) -> Option<String> {
+    header.split(';').find_map(|pair| {
+        let pair = pair.trim();
+        let (key, value) = pair.split_once('=')?;
+        if key.trim() == name {
+            Some(value.trim().to_string())
+        } else {
+            None
+        }
+    })
 }
 
 #[derive(Debug, Clone)]

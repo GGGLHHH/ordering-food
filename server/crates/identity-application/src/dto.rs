@@ -25,3 +25,25 @@ pub struct UserReadModel {
     pub updated_at: Timestamp,
     pub deleted_at: Option<Timestamp>,
 }
+
+#[derive(Debug, Clone)]
+pub struct StoredCredential {
+    pub user_id: String,
+    pub password_hash: String,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Debug, Clone)]
+pub struct TokenPair {
+    pub access_token: String,
+    pub access_token_expires_in: u64,
+    pub refresh_token: String,
+    pub refresh_token_expires_in: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AccessTokenClaims {
+    pub user_id: String,
+    pub exp: u64,
+}

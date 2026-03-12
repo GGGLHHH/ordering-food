@@ -94,6 +94,9 @@ pub struct CreateIdentityUserRequest {
     #[ts(optional)]
     pub avatar_url: Option<String>,
     pub identities: Vec<CreateIdentityUserIdentityRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
@@ -197,6 +200,7 @@ pub async fn create_user(
                     identifier: identity.identifier,
                 })
                 .collect(),
+            password: payload.password,
         })
         .await
         .map_err(|error| map_application_error(error, context.request_id.clone()))?;
@@ -385,6 +389,9 @@ fn map_application_error(error: ApplicationError, request_id: Option<String>) ->
         ApplicationError::Conflict { message } => {
             AppError::conflict(message).with_request_id(request_id)
         }
+        ApplicationError::Unauthorized { message } => {
+            AppError::unauthorized(message).with_request_id(request_id)
+        }
         ApplicationError::Unexpected { .. } => {
             AppError::internal("internal server error").with_request_id(request_id)
         }
@@ -491,8 +498,9 @@ mod tests {
         response::Response,
     };
     use ordering_food_identity_application::{
-        Clock, IdGenerator, TransactionContext, TransactionManager, UserReadRepository,
-        UserRepository,
+        AccessTokenClaims, ApplicationError, Clock, CredentialRepository, IdGenerator,
+        PasswordHasher, RefreshTokenStore, StoredCredential, TokenPair, TokenService,
+        TransactionContext, TransactionManager, UserReadRepository, UserRepository,
     };
     use ordering_food_identity_domain::{
         IdentityType, NormalizedIdentifier, User, UserIdentity, UserProfile, UserStatus,
@@ -677,6 +685,83 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FakePasswordHasher;
+
+    #[async_trait]
+    impl PasswordHasher for FakePasswordHasher {
+        async fn hash(&self, raw: &str) -> Result<String, ApplicationError> {
+            Ok(format!("hashed:{raw}"))
+        }
+        async fn verify(&self, _raw: &str, _hash: &str) -> Result<bool, ApplicationError> {
+            Ok(true)
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeCredentialRepository;
+
+    #[async_trait]
+    impl CredentialRepository for FakeCredentialRepository {
+        async fn find_by_user_id(
+            &self,
+            _tx: &mut dyn TransactionContext,
+            _user_id: &ordering_food_identity_domain::UserId,
+        ) -> Result<Option<StoredCredential>, ApplicationError> {
+            Ok(None)
+        }
+        async fn upsert(
+            &self,
+            _tx: &mut dyn TransactionContext,
+            _user_id: &ordering_food_identity_domain::UserId,
+            _hash: &str,
+            _now: ordering_food_shared_kernel::Timestamp,
+        ) -> Result<(), ApplicationError> {
+            Ok(())
+        }
+    }
+
+    struct FakeTokenService;
+
+    #[async_trait]
+    impl TokenService for FakeTokenService {
+        fn generate_token_pair(&self, user_id: &str) -> Result<TokenPair, ApplicationError> {
+            Ok(TokenPair {
+                access_token: format!("at-{user_id}"),
+                access_token_expires_in: 900,
+                refresh_token: format!("rt-{user_id}"),
+                refresh_token_expires_in: 604800,
+            })
+        }
+        fn verify_access_token(&self, _token: &str) -> Result<AccessTokenClaims, ApplicationError> {
+            Err(ApplicationError::unauthorized("not implemented"))
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeRefreshTokenStore;
+
+    #[async_trait]
+    impl RefreshTokenStore for FakeRefreshTokenStore {
+        async fn store(
+            &self,
+            _token: &str,
+            _user_id: &str,
+            _ttl: u64,
+        ) -> Result<(), ApplicationError> {
+            Ok(())
+        }
+        async fn lookup(&self, _token: &str) -> Result<Option<String>, ApplicationError> {
+            Ok(None)
+        }
+        async fn revoke(&self, _token: &str) -> Result<(), ApplicationError> {
+            Ok(())
+        }
+        async fn revoke_all_for_user(&self, _user_id: &str) -> Result<(), ApplicationError> {
+            Ok(())
+        }
+    }
+
     fn build_test_app(repository: Arc<FakeRepository>) -> Router {
         let module = Arc::new(IdentityModule::new(
             repository.clone(),
@@ -688,6 +773,10 @@ mod tests {
             Arc::new(FakeIdGenerator {
                 next_id: ordering_food_identity_domain::UserId::new("user-123"),
             }),
+            Arc::new(FakeCredentialRepository),
+            Arc::new(FakePasswordHasher),
+            Arc::new(FakeTokenService),
+            Arc::new(FakeRefreshTokenStore),
         ));
         let request_id_header = HeaderName::from_static("x-request-id");
 
@@ -876,6 +965,41 @@ mod tests {
         assert_eq!(body["user_id"], "user-disable");
         assert_eq!(body["status"], "disabled");
         assert_eq!(body["updated_at"], "2026-03-10T08:00:00Z");
+    }
+
+    #[tokio::test]
+    async fn disable_user_returns_conflict_envelope_when_user_is_already_disabled() {
+        let repository = Arc::new(FakeRepository::default());
+        repository.seed(
+            User::rehydrate(
+                ordering_food_identity_domain::UserId::new("user-disable"),
+                UserStatus::Disabled,
+                UserProfile::new("Alice", None, None, None).unwrap(),
+                Vec::new(),
+                datetime!(2026-03-10 06:00 UTC),
+                datetime!(2026-03-10 07:00 UTC),
+                None,
+            )
+            .unwrap(),
+        );
+        let app = build_test_app(repository);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/identity/users/user-disable/disable")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "conflict");
+        assert_eq!(body["message"], "user can no longer be disabled");
     }
 
     #[tokio::test]

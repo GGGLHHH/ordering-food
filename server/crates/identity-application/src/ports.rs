@@ -1,4 +1,5 @@
-use crate::{ApplicationError, UserReadModel};
+use crate::{AccessTokenClaims, TokenPair};
+use crate::{ApplicationError, StoredCredential, UserReadModel};
 use async_trait::async_trait;
 use ordering_food_identity_domain::{IdentityType, NormalizedIdentifier, User, UserId};
 use ordering_food_shared_kernel::Timestamp;
@@ -74,4 +75,47 @@ impl UserQueryService {
     ) -> Result<Option<UserReadModel>, ApplicationError> {
         self.repository.get_by_id(user_id).await
     }
+}
+
+#[async_trait]
+pub trait PasswordHasher: Send + Sync {
+    async fn hash(&self, raw_password: &str) -> Result<String, ApplicationError>;
+    async fn verify(&self, raw_password: &str, hash: &str) -> Result<bool, ApplicationError>;
+}
+
+#[async_trait]
+pub trait CredentialRepository: Send + Sync {
+    async fn find_by_user_id(
+        &self,
+        tx: &mut dyn TransactionContext,
+        user_id: &UserId,
+    ) -> Result<Option<StoredCredential>, ApplicationError>;
+
+    async fn upsert(
+        &self,
+        tx: &mut dyn TransactionContext,
+        user_id: &UserId,
+        password_hash: &str,
+        now: Timestamp,
+    ) -> Result<(), ApplicationError>;
+}
+
+#[async_trait]
+pub trait TokenService: Send + Sync {
+    fn generate_token_pair(&self, user_id: &str) -> Result<TokenPair, ApplicationError>;
+    fn verify_access_token(&self, token: &str) -> Result<AccessTokenClaims, ApplicationError>;
+}
+
+#[async_trait]
+pub trait RefreshTokenStore: Send + Sync {
+    async fn store(
+        &self,
+        token: &str,
+        user_id: &str,
+        ttl_seconds: u64,
+    ) -> Result<(), ApplicationError>;
+
+    async fn lookup(&self, token: &str) -> Result<Option<String>, ApplicationError>;
+    async fn revoke(&self, token: &str) -> Result<(), ApplicationError>;
+    async fn revoke_all_for_user(&self, user_id: &str) -> Result<(), ApplicationError>;
 }

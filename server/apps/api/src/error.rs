@@ -52,6 +52,7 @@ pub enum FieldLocation {
 enum AppErrorKind {
     InvalidRequest,
     ValidationError,
+    Unauthorized,
     Conflict,
     UnsupportedMediaType,
     PayloadTooLarge,
@@ -66,6 +67,7 @@ impl AppErrorKind {
         match self {
             Self::InvalidRequest => StatusCode::BAD_REQUEST,
             Self::ValidationError => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Conflict => StatusCode::CONFLICT,
             Self::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
@@ -80,6 +82,7 @@ impl AppErrorKind {
         match self {
             Self::InvalidRequest => "invalid_request",
             Self::ValidationError => "validation_error",
+            Self::Unauthorized => "unauthorized",
             Self::Conflict => "conflict",
             Self::UnsupportedMediaType => "unsupported_media_type",
             Self::PayloadTooLarge => "payload_too_large",
@@ -110,6 +113,10 @@ impl AppError {
 
     pub fn validation_error(message: impl Into<String>) -> Self {
         Self::new(AppErrorKind::ValidationError, message)
+    }
+
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::Unauthorized, message)
     }
 
     pub fn conflict(message: impl Into<String>) -> Self {

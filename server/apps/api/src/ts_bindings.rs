@@ -6,6 +6,7 @@ use crate::{
         ExampleItemPath, ExampleItemResponse, ExamplePayload, ExamplePayloadResponse,
         ExampleSearchQuery, ExampleSearchResponse,
     },
+    routes::auth::{AuthMeResponse, AuthResponse, LoginRequest},
     routes::identity::{
         BindIdentityUserIdentityRequest, CreateIdentityUserIdentityRequest,
         CreateIdentityUserRequest, IdentityUserIdentityResponse, IdentityUserPath,
@@ -76,6 +77,9 @@ fn export_contract_types(config: &Config) -> Result<(), ts_rs::ExportError> {
     IdentityUserIdentityResponse::export_all(config)?;
     IdentityUserProfileResponse::export_all(config)?;
     IdentityUserResponse::export_all(config)?;
+    LoginRequest::export_all(config)?;
+    AuthResponse::export_all(config)?;
+    AuthMeResponse::export_all(config)?;
     Ok(())
 }
 

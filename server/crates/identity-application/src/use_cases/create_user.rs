@@ -1,4 +1,7 @@
-use crate::{ApplicationError, Clock, IdGenerator, TransactionManager, UserRepository};
+use crate::{
+    ApplicationError, Clock, CredentialRepository, IdGenerator, PasswordHasher, TransactionManager,
+    UserRepository,
+};
 use ordering_food_identity_domain::{
     IdentityType, NormalizedIdentifier, User, UserIdentity, UserProfile,
 };
@@ -17,6 +20,7 @@ pub struct CreateUserInput {
     pub family_name: Option<String>,
     pub avatar_url: Option<String>,
     pub identities: Vec<CreateUserIdentityInput>,
+    pub password: Option<String>,
 }
 
 pub struct CreateUser {
@@ -24,6 +28,8 @@ pub struct CreateUser {
     transaction_manager: Arc<dyn TransactionManager>,
     clock: Arc<dyn Clock>,
     id_generator: Arc<dyn IdGenerator>,
+    password_hasher: Arc<dyn PasswordHasher>,
+    credential_repository: Arc<dyn CredentialRepository>,
 }
 
 impl CreateUser {
@@ -32,12 +38,16 @@ impl CreateUser {
         transaction_manager: Arc<dyn TransactionManager>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
+        password_hasher: Arc<dyn PasswordHasher>,
+        credential_repository: Arc<dyn CredentialRepository>,
     ) -> Self {
         Self {
             repository,
             transaction_manager,
             clock,
             id_generator,
+            password_hasher,
+            credential_repository,
         }
     }
 
@@ -81,6 +91,18 @@ impl CreateUser {
             return Err(error);
         }
 
+        if let Some(raw_password) = &input.password {
+            let password_hash = self.password_hasher.hash(raw_password).await?;
+            if let Err(error) = self
+                .credential_repository
+                .upsert(tx.as_mut(), user.id(), &password_hash, now)
+                .await
+            {
+                self.transaction_manager.rollback(tx).await?;
+                return Err(error);
+            }
+        }
+
         self.transaction_manager.commit(tx).await?;
         Ok(user)
     }
@@ -90,8 +112,9 @@ impl CreateUser {
 mod tests {
     use super::*;
     use crate::{
-        ApplicationError, Clock, IdGenerator, TransactionContext, TransactionManager,
-        UserReadRepository, UserRepository,
+        ApplicationError, Clock, CredentialRepository, IdGenerator, PasswordHasher,
+        StoredCredential, TransactionContext, TransactionManager, UserReadRepository,
+        UserRepository,
     };
     use async_trait::async_trait;
     use ordering_food_identity_domain::{NormalizedIdentifier, UserId};
@@ -231,19 +254,69 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FakePasswordHasher;
+
+    #[async_trait]
+    impl PasswordHasher for FakePasswordHasher {
+        async fn hash(&self, raw_password: &str) -> Result<String, ApplicationError> {
+            Ok(format!("hashed:{raw_password}"))
+        }
+
+        async fn verify(&self, _raw_password: &str, _hash: &str) -> Result<bool, ApplicationError> {
+            Ok(true)
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeCredentialRepository;
+
+    #[async_trait]
+    impl CredentialRepository for FakeCredentialRepository {
+        async fn find_by_user_id(
+            &self,
+            _tx: &mut dyn TransactionContext,
+            _user_id: &UserId,
+        ) -> Result<Option<StoredCredential>, ApplicationError> {
+            Ok(None)
+        }
+
+        async fn upsert(
+            &self,
+            _tx: &mut dyn TransactionContext,
+            _user_id: &UserId,
+            _password_hash: &str,
+            _now: Timestamp,
+        ) -> Result<(), ApplicationError> {
+            Ok(())
+        }
+    }
+
+    fn build_create_user(
+        repository: Arc<FakeRepository>,
+        transactions: Arc<FakeTransactionManager>,
+        now: Timestamp,
+        next_id: UserId,
+    ) -> CreateUser {
+        CreateUser::new(
+            repository,
+            transactions,
+            Arc::new(FakeClock { now }),
+            Arc::new(FakeIdGenerator { next_id }),
+            Arc::new(FakePasswordHasher),
+            Arc::new(FakeCredentialRepository),
+        )
+    }
+
     #[tokio::test]
     async fn create_user_generates_id_and_persists_aggregate() {
         let repository = Arc::new(FakeRepository::default());
         let transactions = Arc::new(FakeTransactionManager::default());
-        let create_user = CreateUser::new(
+        let create_user = build_create_user(
             repository.clone(),
             transactions.clone(),
-            Arc::new(FakeClock {
-                now: datetime!(2026-03-10 08:00 UTC),
-            }),
-            Arc::new(FakeIdGenerator {
-                next_id: UserId::new("user-1"),
-            }),
+            datetime!(2026-03-10 08:00 UTC),
+            UserId::new("user-1"),
         );
 
         let user = create_user
@@ -256,6 +329,7 @@ mod tests {
                     identity_type: "email".to_string(),
                     identifier: "Alice@Example.com".to_string(),
                 }],
+                password: None,
             })
             .await
             .unwrap();
@@ -288,15 +362,11 @@ mod tests {
         );
 
         let transactions = Arc::new(FakeTransactionManager::default());
-        let create_user = CreateUser::new(
+        let create_user = build_create_user(
             repository,
             transactions.clone(),
-            Arc::new(FakeClock {
-                now: datetime!(2026-03-10 08:00 UTC),
-            }),
-            Arc::new(FakeIdGenerator {
-                next_id: UserId::new("user-2"),
-            }),
+            datetime!(2026-03-10 08:00 UTC),
+            UserId::new("user-2"),
         );
 
         let error = create_user
@@ -309,6 +379,7 @@ mod tests {
                     identity_type: "email".to_string(),
                     identifier: "existing@example.com".to_string(),
                 }],
+                password: None,
             })
             .await
             .unwrap_err();

@@ -17,6 +17,7 @@ config.workspace = true
 dotenvy.workspace = true
 ordering-food-identity-application = { path = "../../crates/identity-application" }
 ordering-food-identity-domain = { path = "../../crates/identity-domain" }
+ordering-food-identity-infrastructure-auth = { path = "../../crates/identity-infrastructure-auth" }
 ordering-food-identity-infrastructure-sqlx = { path = "../../crates/identity-infrastructure-sqlx" }
 ordering-food-bootstrap-core = { path = "../../crates/bootstrap-core" }
 ordering-food-shared-kernel = { path = "../../crates/shared-kernel" }

@@ -16,6 +16,13 @@ max_connections = 10
 
 [redis]
 url = "redis://127.0.0.1:6379"
+
+[auth]
+jwt_secret = "change-me-in-production"
+access_token_ttl_seconds = 900
+refresh_token_ttl_seconds = 604800
+cookie_domain = ""
+cookie_secure = true
 "#;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -23,6 +30,7 @@ pub struct Settings {
     pub app: AppSettings,
     pub database: DatabaseSettings,
     pub redis: RedisSettings,
+    pub auth: AuthSettings,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -43,6 +51,21 @@ pub struct DatabaseSettings {
 #[derive(Debug, Clone, Deserialize)]
 pub struct RedisSettings {
     pub url: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuthSettings {
+    pub jwt_secret: String,
+    pub access_token_ttl_seconds: u64,
+    pub refresh_token_ttl_seconds: u64,
+    #[serde(default)]
+    pub cookie_domain: String,
+    #[serde(default = "default_true")]
+    pub cookie_secure: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Settings {
@@ -134,6 +157,39 @@ fn build_override_toml(overrides: &BTreeMap<String, String>) -> Result<String> {
         lines.push(format!("redis.url = {}", quote_toml_string(redis_url)));
     }
 
+    if let Some(jwt_secret) = overrides.get("AUTH__JWT_SECRET") {
+        lines.push(format!(
+            "auth.jwt_secret = {}",
+            quote_toml_string(jwt_secret)
+        ));
+    }
+
+    if let Some(access_ttl) = overrides.get("AUTH__ACCESS_TOKEN_TTL_SECONDS") {
+        let access_ttl = access_ttl.parse::<u64>().map_err(|_| {
+            anyhow!("AUTH__ACCESS_TOKEN_TTL_SECONDS must be a valid u64, got `{access_ttl}`")
+        })?;
+        lines.push(format!("auth.access_token_ttl_seconds = {access_ttl}"));
+    }
+
+    if let Some(refresh_ttl) = overrides.get("AUTH__REFRESH_TOKEN_TTL_SECONDS") {
+        let refresh_ttl = refresh_ttl.parse::<u64>().map_err(|_| {
+            anyhow!("AUTH__REFRESH_TOKEN_TTL_SECONDS must be a valid u64, got `{refresh_ttl}`")
+        })?;
+        lines.push(format!("auth.refresh_token_ttl_seconds = {refresh_ttl}"));
+    }
+
+    if let Some(cookie_domain) = overrides.get("AUTH__COOKIE_DOMAIN") {
+        lines.push(format!(
+            "auth.cookie_domain = {}",
+            quote_toml_string(cookie_domain)
+        ));
+    }
+
+    if let Some(cookie_secure) = overrides.get("AUTH__COOKIE_SECURE") {
+        let cookie_secure = parse_bool("AUTH__COOKIE_SECURE", cookie_secure)?;
+        lines.push(format!("auth.cookie_secure = {cookie_secure}"));
+    }
+
     Ok(lines.join("\n"))
 }
 
@@ -159,6 +215,11 @@ fn is_supported_env_key(key: &str) -> bool {
             | "DATABASE__URL"
             | "DATABASE__MAX_CONNECTIONS"
             | "REDIS__URL"
+            | "AUTH__JWT_SECRET"
+            | "AUTH__ACCESS_TOKEN_TTL_SECONDS"
+            | "AUTH__REFRESH_TOKEN_TTL_SECONDS"
+            | "AUTH__COOKIE_DOMAIN"
+            | "AUTH__COOKIE_SECURE"
     )
 }
 

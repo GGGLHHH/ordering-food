@@ -5,6 +5,7 @@ members = [
     "crates/identity-domain",
     "crates/identity-application",
     "crates/identity-infrastructure-sqlx",
+    "crates/identity-infrastructure-auth",
     "crates/bootstrap-core",
 ]
 resolver = "3"
@@ -39,3 +40,5 @@ ts-rs = { version = "12", default-features = false, features = ["serde-compat"] 
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 uuid = { version = "1", features = ["serde", "v7"] }
+argon2 = { version = "0.5", features = ["std"] }
+jsonwebtoken = "9"
