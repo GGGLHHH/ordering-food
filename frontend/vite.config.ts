@@ -5,6 +5,7 @@ import viteReact from '@vitejs/plugin-react'
 import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import { codeInspectorPlugin } from 'code-inspector-plugin'
 
 const API_PROXY_TARGET = 'http://127.0.0.1:8080'
 const REACT_QUERY_CLIENT_DIRECTIVE_PATTERN = /@tanstack\/react-query\/build\/modern\/.+\.js$/
@@ -49,6 +50,9 @@ const config = defineConfig({
     tailwindcss(),
     tanstackStart(),
     viteReact(),
+    codeInspectorPlugin({
+      bundler: 'vite',
+    }),
   ],
 })
 
