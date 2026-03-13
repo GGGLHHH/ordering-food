@@ -747,6 +747,19 @@ mod tests {
             .join("; ")
     }
 
+    fn set_cookie_value(response: &Response<Body>, name: &str) -> Option<String> {
+        response
+            .headers()
+            .get_all(SET_COOKIE)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .find_map(|value| {
+                let cookie = value.split(';').next()?;
+                let (cookie_name, cookie_value) = cookie.split_once('=')?;
+                (cookie_name == name).then(|| cookie_value.to_string())
+            })
+    }
+
     #[tokio::test]
     async fn login_sets_auth_cookies_and_returns_body() {
         let repository = Arc::new(FakeRepository::default());
@@ -985,5 +998,90 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         let body = response_json(response).await;
         assert_eq!(body["code"], "unauthorized");
+    }
+
+    #[tokio::test]
+    async fn refresh_rotates_cookies_on_success() {
+        let repository = Arc::new(FakeRepository::default());
+        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
+        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        credential_repository.seed(StoredCredential {
+            user_id: "user-1".to_string(),
+            password_hash: "hashed:secret123".to_string(),
+            created_at: datetime!(2026-03-10 06:00 UTC),
+            updated_at: datetime!(2026-03-10 06:00 UTC),
+        });
+        let (app, _) = build_test_app(
+            repository,
+            credential_repository,
+            Arc::new(FakeTokenService::default()),
+            Arc::new(FakeRefreshTokenStore::default()),
+        );
+
+        let login_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(AUTH_LOGIN_PATH)
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"identity_type":"email","identifier":"alice@example.com","password":"secret123"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let old_access = set_cookie_value(&login_response, "access_token").unwrap();
+        let old_refresh = set_cookie_value(&login_response, "refresh_token").unwrap();
+        let cookie = cookie_header(&login_response);
+
+        let refresh_response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(AUTH_REFRESH_PATH)
+                    .header("cookie", cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(refresh_response.status(), StatusCode::OK);
+
+        let new_access = set_cookie_value(&refresh_response, "access_token").unwrap();
+        let new_refresh = set_cookie_value(&refresh_response, "refresh_token").unwrap();
+
+        assert_ne!(old_access, new_access);
+        assert_ne!(old_refresh, new_refresh);
+    }
+
+    #[tokio::test]
+    async fn me_rejects_invalid_access_token() {
+        let (app, _) = build_test_app(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCredentialRepository::default()),
+            Arc::new(FakeTokenService::default()),
+            Arc::new(FakeRefreshTokenStore::default()),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(AUTH_ME_PATH)
+                    .header("cookie", "access_token=bogus-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "unauthorized");
+        assert_eq!(body["message"], "invalid or expired access token");
     }
 }

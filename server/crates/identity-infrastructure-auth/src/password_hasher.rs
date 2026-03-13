@@ -41,3 +41,26 @@ impl PasswordHasher for Argon2PasswordHasher {
         .map_err(|e| ApplicationError::unexpected(format!("password verify task failed: {e}")))?
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Argon2PasswordHasher;
+    use ordering_food_identity_application::PasswordHasher;
+
+    #[tokio::test]
+    async fn hash_and_verify_round_trip_succeeds() {
+        let hasher = Argon2PasswordHasher;
+        let hash = hasher.hash("secret123").await.unwrap();
+
+        assert_ne!(hash, "secret123");
+        assert!(hasher.verify("secret123", &hash).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn verify_returns_false_for_wrong_password() {
+        let hasher = Argon2PasswordHasher;
+        let hash = hasher.hash("secret123").await.unwrap();
+
+        assert!(!hasher.verify("wrong-password", &hash).await.unwrap());
+    }
+}

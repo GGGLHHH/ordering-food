@@ -85,3 +85,98 @@ impl TransactionManager for SqlxTransactionManager {
         Self::downcast_context(tx)?.rollback().await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::MIGRATOR;
+    use std::{env, fs, path::PathBuf};
+    use uuid::Uuid;
+
+    fn database_url() -> String {
+        env::var("DATABASE_URL").unwrap_or_else(|_| {
+            let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../.env");
+            let contents = fs::read_to_string(env_path).expect("read repository .env");
+            contents
+                .lines()
+                .find_map(|line| line.strip_prefix("DATABASE__URL="))
+                .expect("DATABASE__URL in .env")
+                .trim()
+                .to_string()
+        })
+    }
+
+    async fn test_pool() -> PgPool {
+        let pool = PgPool::connect(&database_url()).await.unwrap();
+        MIGRATOR.run(&pool).await.unwrap();
+        pool
+    }
+
+    #[tokio::test]
+    async fn commit_persists_changes() {
+        let pool = test_pool().await;
+        let manager = SqlxTransactionManager::new(pool.clone());
+        let user_id = Uuid::now_v7();
+
+        let mut tx = manager.begin().await.unwrap();
+        let transaction = tx
+            .as_any_mut()
+            .downcast_mut::<SqlxTransactionContext>()
+            .unwrap()
+            .transaction_mut();
+
+        sqlx::query(
+            "INSERT INTO identity.users (id, status, created_at, updated_at, deleted_at) VALUES ($1, 'active', NOW(), NOW(), NULL)",
+        )
+        .bind(user_id)
+        .execute(&mut **transaction)
+        .await
+        .unwrap();
+
+        manager.commit(tx).await.unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+
+        sqlx::query("DELETE FROM identity.users WHERE id = $1")
+            .bind(user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn rollback_discards_changes() {
+        let pool = test_pool().await;
+        let manager = SqlxTransactionManager::new(pool.clone());
+        let user_id = Uuid::now_v7();
+
+        let mut tx = manager.begin().await.unwrap();
+        let transaction = tx
+            .as_any_mut()
+            .downcast_mut::<SqlxTransactionContext>()
+            .unwrap()
+            .transaction_mut();
+
+        sqlx::query(
+            "INSERT INTO identity.users (id, status, created_at, updated_at, deleted_at) VALUES ($1, 'active', NOW(), NOW(), NULL)",
+        )
+        .bind(user_id)
+        .execute(&mut **transaction)
+        .await
+        .unwrap();
+
+        manager.rollback(tx).await.unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+}

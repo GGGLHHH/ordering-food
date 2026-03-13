@@ -113,3 +113,53 @@ impl RefreshTokenStore for RedisRefreshTokenStore {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::RedisRefreshTokenStore;
+    use ordering_food_identity_application::RefreshTokenStore;
+
+    fn redis_url() -> String {
+        std::env::var("REDIS__URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string())
+    }
+
+    async fn test_store() -> RedisRefreshTokenStore {
+        let client = redis::Client::open(redis_url()).expect("redis client");
+        RedisRefreshTokenStore::new(client)
+    }
+
+    #[tokio::test]
+    async fn store_lookup_and_revoke_round_trip() {
+        let store = test_store().await;
+        let token = format!("test-rt-{}", uuid::Uuid::now_v7());
+        let user_id = format!("user-{}", uuid::Uuid::now_v7());
+
+        store.store(&token, &user_id, 60).await.unwrap();
+        assert_eq!(store.lookup(&token).await.unwrap(), Some(user_id.clone()));
+
+        store.revoke(&token).await.unwrap();
+        assert_eq!(store.lookup(&token).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn revoke_all_for_user_removes_all_tokens_for_that_user() {
+        let store = test_store().await;
+        let user_id = format!("user-{}", uuid::Uuid::now_v7());
+        let token_a = format!("test-rt-a-{}", uuid::Uuid::now_v7());
+        let token_b = format!("test-rt-b-{}", uuid::Uuid::now_v7());
+        let other_token = format!("test-rt-other-{}", uuid::Uuid::now_v7());
+
+        store.store(&token_a, &user_id, 60).await.unwrap();
+        store.store(&token_b, &user_id, 60).await.unwrap();
+        store.store(&other_token, "other-user", 60).await.unwrap();
+
+        store.revoke_all_for_user(&user_id).await.unwrap();
+
+        assert_eq!(store.lookup(&token_a).await.unwrap(), None);
+        assert_eq!(store.lookup(&token_b).await.unwrap(), None);
+        assert_eq!(
+            store.lookup(&other_token).await.unwrap(),
+            Some("other-user".to_string())
+        );
+    }
+}

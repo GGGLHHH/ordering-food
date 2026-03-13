@@ -167,7 +167,10 @@ mod tests {
         let output_dir =
             resolve_output_dir(Some("../frontend/src/contracts/generated".to_string())).unwrap();
 
-        assert_eq!(output_dir, PathBuf::from("../frontend/src/contracts/generated"));
+        assert_eq!(
+            output_dir,
+            PathBuf::from("../frontend/src/contracts/generated")
+        );
     }
 
     #[test]

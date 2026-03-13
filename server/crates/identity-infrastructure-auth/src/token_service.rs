@@ -73,3 +73,54 @@ impl TokenService for JwtTokenService {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::JwtTokenService;
+    use ordering_food_identity_application::{ApplicationError, TokenService};
+
+    #[test]
+    fn generate_token_pair_creates_verifiable_access_token() {
+        let service = JwtTokenService::new("test-secret".to_string(), 900, 604800);
+
+        let token_pair = service.generate_token_pair("user-1").unwrap();
+        let claims = service
+            .verify_access_token(&token_pair.access_token)
+            .unwrap();
+
+        assert_eq!(claims.user_id, "user-1");
+        assert_eq!(token_pair.access_token_expires_in, 900);
+        assert_eq!(token_pair.refresh_token_expires_in, 604800);
+        assert!(uuid::Uuid::parse_str(&token_pair.refresh_token).is_ok());
+    }
+
+    #[test]
+    fn verify_access_token_rejects_token_signed_with_other_secret() {
+        let signer = JwtTokenService::new("secret-a".to_string(), 900, 604800);
+        let verifier = JwtTokenService::new("secret-b".to_string(), 900, 604800);
+        let token_pair = signer.generate_token_pair("user-1").unwrap();
+
+        let error = verifier
+            .verify_access_token(&token_pair.access_token)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            ApplicationError::Unauthorized { ref message }
+            if message == "invalid or expired access token"
+        ));
+    }
+
+    #[test]
+    fn verify_access_token_rejects_malformed_token() {
+        let service = JwtTokenService::new("test-secret".to_string(), 900, 604800);
+
+        let error = service.verify_access_token("not-a-jwt").unwrap_err();
+
+        assert!(matches!(
+            error,
+            ApplicationError::Unauthorized { ref message }
+            if message == "invalid or expired access token"
+        ));
+    }
+}

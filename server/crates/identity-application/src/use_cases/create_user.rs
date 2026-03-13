@@ -269,7 +269,16 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeCredentialRepository;
+    struct FakeCredentialRepository {
+        upserts: Mutex<Vec<(String, String, Timestamp)>>,
+        fail_upsert: Mutex<bool>,
+    }
+
+    impl FakeCredentialRepository {
+        fn fail_on_upsert(&self) {
+            *self.fail_upsert.lock().unwrap() = true;
+        }
+    }
 
     #[async_trait]
     impl CredentialRepository for FakeCredentialRepository {
@@ -284,10 +293,19 @@ mod tests {
         async fn upsert(
             &self,
             _tx: &mut dyn TransactionContext,
-            _user_id: &UserId,
-            _password_hash: &str,
-            _now: Timestamp,
+            user_id: &UserId,
+            password_hash: &str,
+            now: Timestamp,
         ) -> Result<(), ApplicationError> {
+            if *self.fail_upsert.lock().unwrap() {
+                return Err(ApplicationError::unexpected("credential upsert failed"));
+            }
+
+            self.upserts.lock().unwrap().push((
+                user_id.as_str().to_string(),
+                password_hash.to_string(),
+                now,
+            ));
             Ok(())
         }
     }
@@ -295,6 +313,7 @@ mod tests {
     fn build_create_user(
         repository: Arc<FakeRepository>,
         transactions: Arc<FakeTransactionManager>,
+        credential_repository: Arc<FakeCredentialRepository>,
         now: Timestamp,
         next_id: UserId,
     ) -> CreateUser {
@@ -304,7 +323,7 @@ mod tests {
             Arc::new(FakeClock { now }),
             Arc::new(FakeIdGenerator { next_id }),
             Arc::new(FakePasswordHasher),
-            Arc::new(FakeCredentialRepository),
+            credential_repository,
         )
     }
 
@@ -312,9 +331,11 @@ mod tests {
     async fn create_user_generates_id_and_persists_aggregate() {
         let repository = Arc::new(FakeRepository::default());
         let transactions = Arc::new(FakeTransactionManager::default());
+        let credential_repository = Arc::new(FakeCredentialRepository::default());
         let create_user = build_create_user(
             repository.clone(),
             transactions.clone(),
+            credential_repository.clone(),
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-1"),
         );
@@ -338,6 +359,7 @@ mod tests {
         assert_eq!(user.identities().len(), 1);
         assert_eq!(*transactions.commit_count.lock().unwrap(), 1);
         assert!(repository.users.lock().unwrap().contains_key("user-1"));
+        assert!(credential_repository.upserts.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -362,9 +384,11 @@ mod tests {
         );
 
         let transactions = Arc::new(FakeTransactionManager::default());
+        let credential_repository = Arc::new(FakeCredentialRepository::default());
         let create_user = build_create_user(
             repository,
             transactions.clone(),
+            credential_repository,
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-2"),
         );
@@ -386,5 +410,106 @@ mod tests {
 
         assert!(matches!(error, ApplicationError::Conflict { .. }));
         assert_eq!(*transactions.rollback_count.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_user_persists_hashed_password_when_password_is_present() {
+        let repository = Arc::new(FakeRepository::default());
+        let transactions = Arc::new(FakeTransactionManager::default());
+        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        let create_user = build_create_user(
+            repository,
+            transactions.clone(),
+            credential_repository.clone(),
+            datetime!(2026-03-10 08:00 UTC),
+            UserId::new("user-3"),
+        );
+
+        let user = create_user
+            .execute(CreateUserInput {
+                display_name: "Alice".to_string(),
+                given_name: None,
+                family_name: None,
+                avatar_url: None,
+                identities: vec![CreateUserIdentityInput {
+                    identity_type: "email".to_string(),
+                    identifier: "Alice@Example.com".to_string(),
+                }],
+                password: Some("secret123".to_string()),
+            })
+            .await
+            .unwrap();
+
+        let upserts = credential_repository.upserts.lock().unwrap();
+        assert_eq!(upserts.len(), 1);
+        assert_eq!(upserts[0].0, user.id().as_str());
+        assert_eq!(upserts[0].1, "hashed:secret123");
+        assert_eq!(*transactions.commit_count.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_user_skips_credential_write_when_password_is_absent() {
+        let repository = Arc::new(FakeRepository::default());
+        let transactions = Arc::new(FakeTransactionManager::default());
+        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        let create_user = build_create_user(
+            repository,
+            transactions,
+            credential_repository.clone(),
+            datetime!(2026-03-10 08:00 UTC),
+            UserId::new("user-4"),
+        );
+
+        create_user
+            .execute(CreateUserInput {
+                display_name: "Alice".to_string(),
+                given_name: None,
+                family_name: None,
+                avatar_url: None,
+                identities: vec![CreateUserIdentityInput {
+                    identity_type: "email".to_string(),
+                    identifier: "Alice@Example.com".to_string(),
+                }],
+                password: None,
+            })
+            .await
+            .unwrap();
+
+        assert!(credential_repository.upserts.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_user_rolls_back_when_credential_upsert_fails() {
+        let repository = Arc::new(FakeRepository::default());
+        let transactions = Arc::new(FakeTransactionManager::default());
+        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        credential_repository.fail_on_upsert();
+        let create_user = build_create_user(
+            repository.clone(),
+            transactions.clone(),
+            credential_repository.clone(),
+            datetime!(2026-03-10 08:00 UTC),
+            UserId::new("user-5"),
+        );
+
+        let error = create_user
+            .execute(CreateUserInput {
+                display_name: "Alice".to_string(),
+                given_name: None,
+                family_name: None,
+                avatar_url: None,
+                identities: vec![CreateUserIdentityInput {
+                    identity_type: "email".to_string(),
+                    identifier: "Alice@Example.com".to_string(),
+                }],
+                password: Some("secret123".to_string()),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::Unexpected { .. }));
+        assert_eq!(*transactions.rollback_count.lock().unwrap(), 1);
+        assert_eq!(*transactions.commit_count.lock().unwrap(), 0);
+        assert!(credential_repository.upserts.lock().unwrap().is_empty());
     }
 }
