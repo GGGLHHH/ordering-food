@@ -18,8 +18,14 @@ function App() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
-            to="/about"
+            to="/menu"
             className="rounded-full border border-[rgba(50,143,151,0.3)] bg-[rgba(79,184,178,0.14)] px-5 py-2.5 font-semibold text-[var(--lagoon-deep)] text-sm no-underline transition hover:-translate-y-0.5 hover:bg-[rgba(79,184,178,0.24)]"
+          >
+            Browse Menu
+          </Link>
+          <Link
+            to="/about"
+            className="rounded-full border border-[rgba(47,106,74,0.24)] bg-[rgba(47,106,74,0.12)] px-5 py-2.5 font-semibold text-[var(--sea-ink)] text-sm no-underline transition hover:-translate-y-0.5 hover:bg-[rgba(47,106,74,0.2)]"
           >
             Project Overview
           </Link>

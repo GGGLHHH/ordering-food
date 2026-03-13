@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as MenuRouteImport } from './routes/menu'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as AboutRouteImport } from './routes/about'
@@ -23,6 +24,11 @@ import { Route as DemoFormAddressRouteImport } from './routes/demo/form.address'
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MenuRoute = MenuRouteImport.update({
+  id: '/menu',
+  path: '/menu',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/menu': typeof MenuRoute
   '/register': typeof RegisterRoute
   '/demo/store': typeof DemoStoreRoute
   '/demo/table': typeof DemoTableRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/menu': typeof MenuRoute
   '/register': typeof RegisterRoute
   '/demo/store': typeof DemoStoreRoute
   '/demo/table': typeof DemoTableRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/health': typeof HealthRoute
   '/login': typeof LoginRoute
+  '/menu': typeof MenuRoute
   '/register': typeof RegisterRoute
   '/demo/store': typeof DemoStoreRoute
   '/demo/table': typeof DemoTableRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/health'
     | '/login'
+    | '/menu'
     | '/register'
     | '/demo/store'
     | '/demo/table'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/health'
     | '/login'
+    | '/menu'
     | '/register'
     | '/demo/store'
     | '/demo/table'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/health'
     | '/login'
+    | '/menu'
     | '/register'
     | '/demo/store'
     | '/demo/table'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
+  MenuRoute: typeof MenuRoute
   RegisterRoute: typeof RegisterRoute
   DemoStoreRoute: typeof DemoStoreRoute
   DemoTableRoute: typeof DemoTableRoute
@@ -167,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/menu': {
+      id: '/menu'
+      path: '/menu'
+      fullPath: '/menu'
+      preLoaderRoute: typeof MenuRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
+  MenuRoute: MenuRoute,
   RegisterRoute: RegisterRoute,
   DemoStoreRoute: DemoStoreRoute,
   DemoTableRoute: DemoTableRoute,
