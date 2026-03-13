@@ -10,7 +10,7 @@ FULL_STACK_SERVICES := $(INFRA_SERVICES) server frontend nginx autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
 GENERATED_API_DIR ?= $(shell awk -F= '/^GENERATED_API_DIR=/{sub(/^GENERATED_API_DIR=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
-.PHONY: help up compose-up down ps logs run dev export-ts migration-up migration-down migration-create migration-info fmt fmt-check clippy test check
+.PHONY: help up compose-up down ps logs run dev export-ts migration-up migration-down migration-create migration-info fmt fmt-check clippy test coverage check
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -63,5 +63,8 @@ clippy: ## Run clippy with warnings denied
 
 test: ## Run Rust tests with cargo-nextest
 	cd $(SERVER_DIR) && cargo nextest run --workspace
+
+coverage: ## Run Rust coverage summary with cargo-llvm-cov
+	cd $(SERVER_DIR) && cargo llvm-cov nextest --workspace --summary-only
 
 check: fmt-check clippy test ## Run the full Rust validation suite

@@ -34,6 +34,7 @@ The `identity` context uses a dedicated PostgreSQL schema:
 - Rust stable toolchain managed by `rustup`
 - Bacon for hot reload: `cargo install --locked bacon`
 - SQLx CLI for manual migration management: `cargo install --locked sqlx-cli --no-default-features --features postgres,rustls`
+- LLVM coverage runner: `cargo install cargo-llvm-cov --locked`
 
 ## Start dependencies
 
@@ -253,10 +254,12 @@ Common commands:
 - `make fmt-check`
 - `make clippy`
 - `make test` (uses `cargo nextest run --workspace`)
+- `make coverage` (uses `cargo llvm-cov nextest --workspace --summary-only`)
 - `make check`
 
 ## Validation
 
 ```bash
 make check
+make coverage
 ```
