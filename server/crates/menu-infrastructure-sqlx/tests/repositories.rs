@@ -9,7 +9,6 @@ use ordering_food_menu_infrastructure_sqlx::{
 };
 use ordering_food_shared_kernel::Timestamp;
 use sqlx::{PgPool, types::time::OffsetDateTime};
-use std::{env, fs, path::PathBuf};
 use uuid::Uuid;
 
 fn unique_uuid() -> Uuid {
@@ -18,25 +17,6 @@ fn unique_uuid() -> Uuid {
 
 fn fixed_timestamp(seconds: i64) -> Timestamp {
     OffsetDateTime::from_unix_timestamp(seconds).unwrap()
-}
-
-fn database_url() -> String {
-    env::var("DATABASE_URL").unwrap_or_else(|_| {
-        let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../.env");
-        let contents = fs::read_to_string(env_path).expect("read repository .env");
-        contents
-            .lines()
-            .find_map(|line| line.strip_prefix("DATABASE__URL="))
-            .expect("DATABASE__URL in .env")
-            .trim()
-            .to_string()
-    })
-}
-
-async fn test_pool() -> PgPool {
-    let pool = PgPool::connect(&database_url()).await.unwrap();
-    MIGRATOR.run(&pool).await.unwrap();
-    pool
 }
 
 async fn insert_store(pool: &PgPool, store: &Store) {
@@ -123,9 +103,8 @@ fn make_item(
     .unwrap()
 }
 
-#[tokio::test]
-async fn sqlx_category_repository_rejects_duplicate_slug_within_store() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_category_repository_rejects_duplicate_slug_within_store(pool: PgPool) {
     let store_id = unique_uuid();
     insert_store(&pool, &make_store(store_id, fixed_timestamp(1))).await;
 
@@ -160,9 +139,8 @@ async fn sqlx_category_repository_rejects_duplicate_slug_within_store() {
     );
 }
 
-#[tokio::test]
-async fn sqlx_item_repository_rejects_duplicate_slug_within_store() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_item_repository_rejects_duplicate_slug_within_store(pool: PgPool) {
     let store_id = unique_uuid();
     let category_a = unique_uuid();
     let category_b = unique_uuid();
@@ -227,9 +205,8 @@ async fn sqlx_item_repository_rejects_duplicate_slug_within_store() {
     );
 }
 
-#[tokio::test]
-async fn migration_rejects_negative_price_amount() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn migration_rejects_negative_price_amount(pool: PgPool) {
     let store_id = unique_uuid();
     let category_id = unique_uuid();
     insert_store(&pool, &make_store(store_id, fixed_timestamp(1_700_000_000))).await;
@@ -265,10 +242,8 @@ async fn migration_rejects_negative_price_amount() {
     assert!(error.as_database_error().is_some());
 }
 
-#[tokio::test]
-async fn migration_rejects_invalid_status_value() {
-    let pool = test_pool().await;
-
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn migration_rejects_invalid_status_value(pool: PgPool) {
     let error = sqlx::query(
         r#"
         INSERT INTO menu.stores (
@@ -285,9 +260,8 @@ async fn migration_rejects_invalid_status_value() {
     assert!(error.as_database_error().is_some());
 }
 
-#[tokio::test]
-async fn read_repositories_return_only_active_non_deleted_records_in_sorted_order() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn read_repositories_return_only_active_non_deleted_records_in_sorted_order(pool: PgPool) {
     let store_id = unique_uuid();
     let category_fast = unique_uuid();
     let category_hidden = unique_uuid();
@@ -450,10 +424,8 @@ async fn read_repositories_return_only_active_non_deleted_records_in_sorted_orde
     assert_eq!(visible_item.price_amount, 1800);
 }
 
-#[tokio::test]
-async fn migration_creates_expected_schema_tables_constraints_and_indexes() {
-    let pool = test_pool().await;
-
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn migration_creates_expected_schema_tables_constraints_and_indexes(pool: PgPool) {
     let store_columns: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'menu' AND table_name = 'stores'",
     )

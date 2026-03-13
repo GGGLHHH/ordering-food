@@ -10,7 +10,6 @@ use ordering_food_identity_infrastructure_sqlx::{
 };
 use ordering_food_shared_kernel::{Identifier, Timestamp};
 use sqlx::{PgPool, Row, types::time::OffsetDateTime};
-use std::{env, fs, path::PathBuf};
 use uuid::Uuid;
 
 fn unique_uuid() -> Uuid {
@@ -51,28 +50,8 @@ async fn insert_user(pool: &PgPool, user: &User) {
     transactions.commit(tx).await.unwrap();
 }
 
-fn database_url() -> String {
-    env::var("DATABASE_URL").unwrap_or_else(|_| {
-        let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../.env");
-        let contents = fs::read_to_string(env_path).expect("read repository .env");
-        contents
-            .lines()
-            .find_map(|line| line.strip_prefix("DATABASE__URL="))
-            .expect("DATABASE__URL in .env")
-            .trim()
-            .to_string()
-    })
-}
-
-async fn test_pool() -> PgPool {
-    let pool = PgPool::connect(&database_url()).await.unwrap();
-    MIGRATOR.run(&pool).await.unwrap();
-    pool
-}
-
-#[tokio::test]
-async fn sqlx_user_repository_inserts_and_loads_uuid_user() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_repository_inserts_and_loads_uuid_user(pool: PgPool) {
     let user_id = unique_uuid();
     let email = unique_email("repo-insert-load");
     let user = make_user(user_id, "Alice", &email, fixed_timestamp(1_700_000_000));
@@ -115,9 +94,8 @@ async fn sqlx_user_repository_inserts_and_loads_uuid_user() {
     assert_eq!(loaded.identities().len(), 1);
 }
 
-#[tokio::test]
-async fn sqlx_user_repository_finds_by_identity() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_repository_finds_by_identity(pool: PgPool) {
     let user_id = unique_uuid();
     let email = unique_email("repo-find-identity");
     let user = make_user(user_id, "Alice", &email, fixed_timestamp(1_700_000_100));
@@ -139,9 +117,8 @@ async fn sqlx_user_repository_finds_by_identity() {
     assert_eq!(loaded.id().as_str(), user.id().as_str());
 }
 
-#[tokio::test]
-async fn sqlx_user_repository_returns_none_for_missing_identity() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_repository_returns_none_for_missing_identity(pool: PgPool) {
     let repository = SqlxUserRepository;
     let transactions = SqlxTransactionManager::new(pool);
     let mut tx = transactions.begin().await.unwrap();
@@ -158,9 +135,8 @@ async fn sqlx_user_repository_returns_none_for_missing_identity() {
     assert!(loaded.is_none());
 }
 
-#[tokio::test]
-async fn sqlx_user_repository_updates_profile_status_and_identities() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_repository_updates_profile_status_and_identities(pool: PgPool) {
     let created_at = fixed_timestamp(1_700_000_200);
     let user_id = unique_uuid();
     let email = unique_email("repo-update");
@@ -202,9 +178,8 @@ async fn sqlx_user_repository_updates_profile_status_and_identities() {
     assert_eq!(loaded.identities().len(), 2);
 }
 
-#[tokio::test]
-async fn sqlx_user_repository_update_returns_not_found_for_missing_user() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_repository_update_returns_not_found_for_missing_user(pool: PgPool) {
     let missing_user = make_user(
         unique_uuid(),
         "Missing",
@@ -225,9 +200,8 @@ async fn sqlx_user_repository_update_returns_not_found_for_missing_user() {
     );
 }
 
-#[tokio::test]
-async fn sqlx_user_repository_rejects_invalid_uuid_string() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_repository_rejects_invalid_uuid_string(pool: PgPool) {
     let repository = SqlxUserRepository;
     let transactions = SqlxTransactionManager::new(pool);
     let mut tx = transactions.begin().await.unwrap();
@@ -241,9 +215,8 @@ async fn sqlx_user_repository_rejects_invalid_uuid_string() {
     );
 }
 
-#[tokio::test]
-async fn sqlx_user_read_repository_returns_none_for_missing_user() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_read_repository_returns_none_for_missing_user(pool: PgPool) {
     let read_repository = SqlxUserReadRepository::new(pool);
 
     let read_model = read_repository
@@ -254,9 +227,8 @@ async fn sqlx_user_read_repository_returns_none_for_missing_user() {
     assert!(read_model.is_none());
 }
 
-#[tokio::test]
-async fn sqlx_user_read_repository_returns_joined_read_model() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_user_read_repository_returns_joined_read_model(pool: PgPool) {
     let user_id = unique_uuid();
     let email = unique_email("repo-read-model");
     let user = make_user(user_id, "Alice", &email, fixed_timestamp(1_700_000_500));
@@ -271,9 +243,8 @@ async fn sqlx_user_read_repository_returns_joined_read_model() {
     assert_eq!(read_model.identities[0].identifier_normalized, email);
 }
 
-#[tokio::test]
-async fn sqlx_credential_repository_returns_none_for_missing_credential() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_credential_repository_returns_none_for_missing_credential(pool: PgPool) {
     let user_id = unique_uuid();
     let email = unique_email("repo-credential-missing");
     let user = make_user(user_id, "Alice", &email, fixed_timestamp(1_700_000_550));
@@ -290,9 +261,8 @@ async fn sqlx_credential_repository_returns_none_for_missing_credential() {
     assert!(credential.is_none());
 }
 
-#[tokio::test]
-async fn sqlx_credential_repository_upsert_and_find_by_user_id() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_credential_repository_upsert_and_find_by_user_id(pool: PgPool) {
     let user_id = unique_uuid();
     let email = unique_email("repo-credential-upsert");
     let user = make_user(user_id, "Alice", &email, fixed_timestamp(1_700_000_600));
@@ -323,9 +293,8 @@ async fn sqlx_credential_repository_upsert_and_find_by_user_id() {
     assert_eq!(credential.password_hash, "hashed:secret123");
 }
 
-#[tokio::test]
-async fn sqlx_credential_repository_upsert_updates_hash_and_timestamp() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_credential_repository_upsert_updates_hash_and_timestamp(pool: PgPool) {
     let user_id = unique_uuid();
     let email = unique_email("repo-credential-update");
     let user = make_user(user_id, "Alice", &email, fixed_timestamp(1_700_000_700));
@@ -377,9 +346,8 @@ async fn sqlx_credential_repository_upsert_updates_hash_and_timestamp() {
     );
 }
 
-#[tokio::test]
-async fn sqlx_credential_repository_rejects_invalid_uuid_string() {
-    let pool = test_pool().await;
+#[sqlx::test(migrator = "MIGRATOR")]
+async fn sqlx_credential_repository_rejects_invalid_uuid_string(pool: PgPool) {
     let repository = SqlxCredentialRepository;
     let transactions = SqlxTransactionManager::new(pool);
     let mut tx = transactions.begin().await.unwrap();

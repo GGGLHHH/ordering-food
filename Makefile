@@ -62,9 +62,9 @@ clippy: ## Run clippy with warnings denied
 	cd $(SERVER_DIR) && cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 test: ## Run Rust tests with cargo-nextest
-	cd $(SERVER_DIR) && cargo nextest run --workspace
+	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' cargo nextest run --workspace
 
 coverage: ## Run Rust coverage summary with cargo-llvm-cov
-	cd $(SERVER_DIR) && cargo llvm-cov nextest --workspace --summary-only
+	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' cargo llvm-cov nextest --workspace --summary-only
 
 check: fmt-check clippy test ## Run the full Rust validation suite

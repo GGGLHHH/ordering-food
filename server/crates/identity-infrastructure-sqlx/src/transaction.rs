@@ -89,32 +89,10 @@ impl TransactionManager for SqlxTransactionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MIGRATOR;
-    use std::{env, fs, path::PathBuf};
     use uuid::Uuid;
 
-    fn database_url() -> String {
-        env::var("DATABASE_URL").unwrap_or_else(|_| {
-            let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../.env");
-            let contents = fs::read_to_string(env_path).expect("read repository .env");
-            contents
-                .lines()
-                .find_map(|line| line.strip_prefix("DATABASE__URL="))
-                .expect("DATABASE__URL in .env")
-                .trim()
-                .to_string()
-        })
-    }
-
-    async fn test_pool() -> PgPool {
-        let pool = PgPool::connect(&database_url()).await.unwrap();
-        MIGRATOR.run(&pool).await.unwrap();
-        pool
-    }
-
-    #[tokio::test]
-    async fn commit_persists_changes() {
-        let pool = test_pool().await;
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn commit_persists_changes(pool: PgPool) {
         let manager = SqlxTransactionManager::new(pool.clone());
         let user_id = Uuid::now_v7();
 
@@ -149,9 +127,8 @@ mod tests {
             .unwrap();
     }
 
-    #[tokio::test]
-    async fn rollback_discards_changes() {
-        let pool = test_pool().await;
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn rollback_discards_changes(pool: PgPool) {
         let manager = SqlxTransactionManager::new(pool.clone());
         let user_id = Uuid::now_v7();
 
