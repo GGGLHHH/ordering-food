@@ -12,6 +12,10 @@ use crate::{
         CreateIdentityUserRequest, IdentityUserIdentityResponse, IdentityUserPath,
         IdentityUserProfileResponse, IdentityUserResponse, UpdateIdentityUserProfileRequest,
     },
+    routes::menu::{
+        MenuCategoriesResponse, MenuCategoryResponse, MenuItemPath, MenuItemResponse,
+        MenuItemsQuery, MenuItemsResponse, MenuStoreResponse,
+    },
 };
 use anyhow::{Context, anyhow, ensure};
 use std::{
@@ -80,6 +84,13 @@ fn export_contract_types(config: &Config) -> Result<(), ts_rs::ExportError> {
     LoginRequest::export_all(config)?;
     AuthResponse::export_all(config)?;
     AuthMeResponse::export_all(config)?;
+    MenuStoreResponse::export_all(config)?;
+    MenuCategoryResponse::export_all(config)?;
+    MenuCategoriesResponse::export_all(config)?;
+    MenuItemsQuery::export_all(config)?;
+    MenuItemPath::export_all(config)?;
+    MenuItemResponse::export_all(config)?;
+    MenuItemsResponse::export_all(config)?;
     Ok(())
 }
 
@@ -195,6 +206,9 @@ mod tests {
             fs::read_to_string(temp_root.join("ExampleItemResponse.ts")).unwrap();
         let identity_user_response =
             fs::read_to_string(temp_root.join("IdentityUserResponse.ts")).unwrap();
+        let menu_store_response =
+            fs::read_to_string(temp_root.join("MenuStoreResponse.ts")).unwrap();
+        let menu_items_query = fs::read_to_string(temp_root.join("MenuItemsQuery.ts")).unwrap();
         let update_identity_user_profile_request =
             fs::read_to_string(temp_root.join("UpdateIdentityUserProfileRequest.ts")).unwrap();
         let index = fs::read_to_string(temp_root.join("index.ts")).unwrap();
@@ -205,11 +219,15 @@ mod tests {
         assert!(ready_response.contains("checks: DependencyChecks"));
         assert!(example_item_response.contains("item_id: number"));
         assert!(identity_user_response.contains("deleted_at?: string"));
+        assert!(menu_store_response.contains("currency_code: string"));
+        assert!(menu_items_query.contains("category_slug?: string"));
         assert!(update_identity_user_profile_request.contains("display_name: string"));
         assert!(index.contains("export * from \"./ErrorEnvelope\";"));
         assert!(index.contains("export * from \"./BindIdentityUserIdentityRequest\";"));
         assert!(index.contains("export * from \"./CreateIdentityUserRequest\";"));
         assert!(index.contains("export * from \"./IdentityUserResponse\";"));
+        assert!(index.contains("export * from \"./MenuStoreResponse\";"));
+        assert!(index.contains("export * from \"./MenuItemsQuery\";"));
         assert!(index.contains("export * from \"./UpdateIdentityUserProfileRequest\";"));
         assert!(index.contains("export * from \"./ReadyResponse\";"));
         assert!(index.contains("export * from \"./ExampleItemResponse\";"));

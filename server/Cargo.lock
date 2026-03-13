@@ -1212,6 +1212,9 @@ dependencies = [
  "ordering-food-identity-domain",
  "ordering-food-identity-infrastructure-auth",
  "ordering-food-identity-infrastructure-sqlx",
+ "ordering-food-menu-application",
+ "ordering-food-menu-domain",
+ "ordering-food-menu-infrastructure-sqlx",
  "ordering-food-shared-kernel",
  "redis",
  "serde",
@@ -1285,6 +1288,40 @@ dependencies = [
  "async-trait",
  "ordering-food-identity-application",
  "ordering-food-identity-domain",
+ "ordering-food-shared-kernel",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-menu-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-menu-domain",
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-menu-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-menu-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-menu-application",
+ "ordering-food-menu-domain",
  "ordering-food-shared-kernel",
  "sqlx",
  "tokio",

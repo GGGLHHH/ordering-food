@@ -1,0 +1,16 @@
+[package]
+name = "ordering-food-menu-application"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ordering-food-menu-domain = { path = "../menu-domain" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+thiserror.workspace = true
+
+[dev-dependencies]
+time.workspace = true
+tokio.workspace = true

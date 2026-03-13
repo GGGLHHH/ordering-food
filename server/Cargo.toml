@@ -6,6 +6,9 @@ members = [
     "crates/identity-application",
     "crates/identity-infrastructure-sqlx",
     "crates/identity-infrastructure-auth",
+    "crates/menu-domain",
+    "crates/menu-application",
+    "crates/menu-infrastructure-sqlx",
     "crates/bootstrap-core",
 ]
 resolver = "3"

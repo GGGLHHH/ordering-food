@@ -19,6 +19,9 @@ ordering-food-identity-application = { path = "../../crates/identity-application
 ordering-food-identity-domain = { path = "../../crates/identity-domain" }
 ordering-food-identity-infrastructure-auth = { path = "../../crates/identity-infrastructure-auth" }
 ordering-food-identity-infrastructure-sqlx = { path = "../../crates/identity-infrastructure-sqlx" }
+ordering-food-menu-application = { path = "../../crates/menu-application" }
+ordering-food-menu-domain = { path = "../../crates/menu-domain" }
+ordering-food-menu-infrastructure-sqlx = { path = "../../crates/menu-infrastructure-sqlx" }
 ordering-food-bootstrap-core = { path = "../../crates/bootstrap-core" }
 ordering-food-shared-kernel = { path = "../../crates/shared-kernel" }
 redis.workspace = true

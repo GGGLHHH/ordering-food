@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS menu.items;
+DROP TABLE IF EXISTS menu.categories;
+DROP TABLE IF EXISTS menu.stores;
+DROP SCHEMA IF EXISTS menu;
