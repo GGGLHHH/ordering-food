@@ -6,6 +6,7 @@ use ordering_food_identity_application::{
 use ordering_food_identity_domain::UserId;
 use ordering_food_shared_kernel::Identifier;
 use sqlx::{PgPool, Row};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SqlxUserReadRepository {
@@ -16,11 +17,17 @@ impl SqlxUserReadRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    fn parse_user_id(user_id: &UserId) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(user_id.as_str())
+            .map_err(|_| ApplicationError::validation("user id must be a valid UUID"))
+    }
 }
 
 #[async_trait]
 impl UserReadRepository for SqlxUserReadRepository {
     async fn get_by_id(&self, user_id: &UserId) -> Result<Option<UserReadModel>, ApplicationError> {
+        let user_id = Self::parse_user_id(user_id)?;
         let row = sqlx::query(
             r#"
             SELECT
@@ -38,7 +45,7 @@ impl UserReadRepository for SqlxUserReadRepository {
             WHERE u.id = $1
             "#,
         )
-        .bind(user_id.as_str())
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|error| {
@@ -57,7 +64,7 @@ impl UserReadRepository for SqlxUserReadRepository {
             ORDER BY identity_type, identifier_normalized
             "#,
         )
-        .bind(user_id.as_str())
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await
         .map_err(|error| {
@@ -75,7 +82,7 @@ impl UserReadRepository for SqlxUserReadRepository {
         .collect();
 
         Ok(Some(UserReadModel {
-            user_id: row.get("id"),
+            user_id: row.get::<Uuid, _>("id").to_string(),
             status: row.get("status"),
             profile: UserProfileReadModel {
                 display_name: row.get("display_name"),

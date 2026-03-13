@@ -1,6 +1,6 @@
 use crate::{
     config::Settings,
-    runtime::{SystemClock, UuidV7UserIdGenerator},
+    runtime::{SystemClock, UuidV4UserIdGenerator},
 };
 use ordering_food_identity_application::{Clock, IdGenerator};
 use sqlx::PgPool;
@@ -22,7 +22,7 @@ impl ApiPlatform {
             pg_pool,
             redis_client,
             clock: Arc::new(SystemClock),
-            id_generator: Arc::new(UuidV7UserIdGenerator),
+            id_generator: Arc::new(UuidV4UserIdGenerator),
         }
     }
 }

@@ -6,6 +6,7 @@ use ordering_food_identity_domain::{
 };
 use ordering_food_shared_kernel::Identifier;
 use sqlx::{Postgres, Row, Transaction};
+use uuid::Uuid;
 
 const UNIQUE_VIOLATION_SQLSTATE: &str = "23505";
 const USER_IDENTITIES_IDENTIFIER_UNIQUE_CONSTRAINT: &str = "user_identities_identifier_unique";
@@ -48,10 +49,16 @@ impl SqlxUserRepository {
             && constraint == Some(USER_IDENTITIES_IDENTIFIER_UNIQUE_CONSTRAINT)
     }
 
+    fn parse_user_id(user_id: &UserId) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(user_id.as_str())
+            .map_err(|_| ApplicationError::validation("user id must be a valid UUID"))
+    }
+
     async fn load_user(
         transaction: &mut Transaction<'static, Postgres>,
         user_id: &UserId,
     ) -> Result<Option<User>, ApplicationError> {
+        let user_id = Self::parse_user_id(user_id)?;
         let row = sqlx::query(
             r#"
             SELECT
@@ -69,7 +76,7 @@ impl SqlxUserRepository {
             WHERE u.id = $1
             "#,
         )
-        .bind(user_id.as_str())
+        .bind(user_id)
         .fetch_optional(&mut **transaction)
         .await
         .map_err(|error| {
@@ -91,7 +98,7 @@ impl SqlxUserRepository {
             ORDER BY identity_type, identifier_normalized
             "#,
         )
-        .bind(user_id.as_str())
+        .bind(user_id)
         .fetch_all(&mut **transaction)
         .await
         .map_err(|error| {
@@ -111,7 +118,7 @@ impl SqlxUserRepository {
         .collect::<Result<Vec<_>, ordering_food_identity_domain::DomainError>>()?;
 
         let user = User::rehydrate(
-            UserId::new(row.get::<String, _>("id")),
+            UserId::new(row.get::<Uuid, _>("id").to_string()),
             UserStatus::parse(row.get::<String, _>("status"))?,
             UserProfile::new(
                 row.get::<String, _>("display_name"),
@@ -163,7 +170,7 @@ impl UserRepository for SqlxUserRepository {
                 error,
             )
         })?
-        .map(|row| UserId::new(row.get::<String, _>("user_id")));
+        .map(|row| UserId::new(row.get::<Uuid, _>("user_id").to_string()));
 
         match user_id {
             Some(user_id) => Self::load_user(transaction, &user_id).await,
@@ -177,6 +184,7 @@ impl UserRepository for SqlxUserRepository {
         user: &User,
     ) -> Result<(), ApplicationError> {
         let transaction = Self::transaction(tx)?;
+        let user_id = Self::parse_user_id(user.id())?;
 
         sqlx::query(
             r#"
@@ -184,7 +192,7 @@ impl UserRepository for SqlxUserRepository {
             VALUES ($1, $2, $3, $4, $5)
             "#,
         )
-        .bind(user.id().as_str())
+        .bind(user_id)
         .bind(user.status().as_str())
         .bind(user.created_at())
         .bind(user.updated_at())
@@ -207,7 +215,7 @@ impl UserRepository for SqlxUserRepository {
             VALUES ($1, $2, $3, $4, $5)
             "#,
         )
-        .bind(user.id().as_str())
+        .bind(user_id)
         .bind(user.profile().display_name())
         .bind(user.profile().given_name())
         .bind(user.profile().family_name())
@@ -233,7 +241,7 @@ impl UserRepository for SqlxUserRepository {
                 VALUES ($1, $2, $3, $4)
                 "#,
             )
-            .bind(user.id().as_str())
+            .bind(user_id)
             .bind(identity.identity_type().as_str())
             .bind(identity.identifier_normalized().as_str())
             .bind(identity.bound_at())
@@ -253,6 +261,7 @@ impl UserRepository for SqlxUserRepository {
         user: &User,
     ) -> Result<(), ApplicationError> {
         let transaction = Self::transaction(tx)?;
+        let user_id = Self::parse_user_id(user.id())?;
 
         let result = sqlx::query(
             r#"
@@ -261,7 +270,7 @@ impl UserRepository for SqlxUserRepository {
             WHERE id = $1
             "#,
         )
-        .bind(user.id().as_str())
+        .bind(user_id)
         .bind(user.status().as_str())
         .bind(user.updated_at())
         .bind(user.deleted_at())
@@ -282,7 +291,7 @@ impl UserRepository for SqlxUserRepository {
             WHERE user_id = $1
             "#,
         )
-        .bind(user.id().as_str())
+        .bind(user_id)
         .bind(user.profile().display_name())
         .bind(user.profile().given_name())
         .bind(user.profile().family_name())
@@ -297,7 +306,7 @@ impl UserRepository for SqlxUserRepository {
         })?;
 
         sqlx::query("DELETE FROM identity.user_identities WHERE user_id = $1")
-            .bind(user.id().as_str())
+            .bind(user_id)
             .execute(&mut **transaction)
             .await
             .map_err(|error| {
@@ -319,7 +328,7 @@ impl UserRepository for SqlxUserRepository {
                 VALUES ($1, $2, $3, $4)
                 "#,
             )
-            .bind(user.id().as_str())
+            .bind(user_id)
             .bind(identity.identity_type().as_str())
             .bind(identity.identifier_normalized().as_str())
             .bind(identity.bound_at())

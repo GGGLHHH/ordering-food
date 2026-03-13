@@ -6,6 +6,7 @@ use ordering_food_identity_application::{
 use ordering_food_identity_domain::UserId;
 use ordering_food_shared_kernel::{Identifier, Timestamp};
 use sqlx::{Postgres, Row, Transaction};
+use uuid::Uuid;
 
 #[derive(Debug, Default)]
 pub struct SqlxCredentialRepository;
@@ -21,6 +22,11 @@ impl SqlxCredentialRepository {
                 ApplicationError::unexpected("unexpected transaction context implementation")
             })
     }
+
+    fn parse_user_id(user_id: &UserId) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(user_id.as_str())
+            .map_err(|_| ApplicationError::validation("user id must be a valid UUID"))
+    }
 }
 
 #[async_trait]
@@ -31,6 +37,7 @@ impl CredentialRepository for SqlxCredentialRepository {
         user_id: &UserId,
     ) -> Result<Option<StoredCredential>, ApplicationError> {
         let transaction = Self::transaction(tx)?;
+        let user_id = Self::parse_user_id(user_id)?;
 
         let row = sqlx::query(
             r#"
@@ -39,7 +46,7 @@ impl CredentialRepository for SqlxCredentialRepository {
             WHERE user_id = $1
             "#,
         )
-        .bind(user_id.as_str())
+        .bind(user_id)
         .fetch_optional(&mut **transaction)
         .await
         .map_err(|error| {
@@ -47,7 +54,7 @@ impl CredentialRepository for SqlxCredentialRepository {
         })?;
 
         Ok(row.map(|r| StoredCredential {
-            user_id: r.get::<String, _>("user_id"),
+            user_id: r.get::<Uuid, _>("user_id").to_string(),
             password_hash: r.get::<String, _>("password_hash"),
             created_at: r.get("created_at"),
             updated_at: r.get("updated_at"),
@@ -62,6 +69,7 @@ impl CredentialRepository for SqlxCredentialRepository {
         now: Timestamp,
     ) -> Result<(), ApplicationError> {
         let transaction = Self::transaction(tx)?;
+        let user_id = Self::parse_user_id(user_id)?;
 
         sqlx::query(
             r#"
@@ -71,7 +79,7 @@ impl CredentialRepository for SqlxCredentialRepository {
             SET password_hash = EXCLUDED.password_hash, updated_at = EXCLUDED.updated_at
             "#,
         )
-        .bind(user_id.as_str())
+        .bind(user_id)
         .bind(password_hash)
         .bind(now)
         .execute(&mut **transaction)

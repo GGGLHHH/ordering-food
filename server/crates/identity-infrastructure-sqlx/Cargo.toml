@@ -11,3 +11,7 @@ ordering-food-identity-application = { path = "../identity-application" }
 ordering-food-identity-domain = { path = "../identity-domain" }
 ordering-food-shared-kernel = { path = "../shared-kernel" }
 sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

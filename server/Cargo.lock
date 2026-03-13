@@ -1287,6 +1287,8 @@ dependencies = [
  "ordering-food-identity-domain",
  "ordering-food-shared-kernel",
  "sqlx",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -2033,6 +2035,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
+ "uuid",
  "webpki-roots 0.26.11",
 ]
 
@@ -2114,6 +2117,7 @@ dependencies = [
  "thiserror",
  "time",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -2152,6 +2156,7 @@ dependencies = [
  "thiserror",
  "time",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -2178,6 +2183,7 @@ dependencies = [
  "time",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]
