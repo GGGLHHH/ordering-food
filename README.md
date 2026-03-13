@@ -252,7 +252,7 @@ Common commands:
 - `make fmt`
 - `make fmt-check`
 - `make clippy`
-- `make test`
+- `make test` (uses `cargo nextest run --workspace`)
 - `make check`
 
 ## Validation
