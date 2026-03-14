@@ -7,8 +7,10 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+
 import type { AuthMeResponse, LoginRequest } from '#/contracts/generated'
 import { ApiError, isAbortError } from '#/integrations/http'
+
 import { getCurrentUser, login, logout } from './api'
 
 export const authKeys = {

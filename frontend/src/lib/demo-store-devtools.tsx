@@ -42,11 +42,11 @@ function DevtoolPanel() {
 
   return (
     <div className="grid grid-cols-[1fr_10fr] gap-4 p-4">
-      <div className="whitespace-nowrap font-bold text-gray-500 text-sm">First Name</div>
+      <div className="text-sm font-bold whitespace-nowrap text-gray-500">First Name</div>
       <div className="text-sm">{state?.firstName}</div>
-      <div className="whitespace-nowrap font-bold text-gray-500 text-sm">Last Name</div>
+      <div className="text-sm font-bold whitespace-nowrap text-gray-500">Last Name</div>
       <div className="text-sm">{state?.lastName}</div>
-      <div className="whitespace-nowrap font-bold text-gray-500 text-sm">Full Name</div>
+      <div className="text-sm font-bold whitespace-nowrap text-gray-500">Full Name</div>
       <div className="text-sm">{state?.fullName}</div>
     </div>
   )

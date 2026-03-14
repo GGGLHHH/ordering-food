@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
+
 import { MenuPage } from '#/features/menu/menu-page'
 
 const menuSearchSchema = z.object({

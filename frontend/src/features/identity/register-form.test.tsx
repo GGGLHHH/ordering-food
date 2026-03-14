@@ -4,7 +4,9 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import { createAppQueryClient } from '#/integrations/tanstack-query/query-client'
+
 import { RegisterForm } from './register-form'
 
 vi.mock('@tanstack/react-router', () => ({

@@ -1,6 +1,8 @@
 import { useDeferredValue } from 'react'
+
 import { ApiError } from '#/integrations/http'
 import { cn } from '#/lib/utils'
+
 import { useMenuCategoriesQuery, useMenuItemsQuery, useMenuStoreQuery } from './queries'
 
 interface MenuPageProps {
@@ -32,10 +34,10 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
         <p className="island-kicker mb-3">Menu</p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
-            <h1 className="display-title max-w-3xl font-bold text-4xl text-[var(--sea-ink)] leading-[1.02] tracking-tight sm:text-5xl">
+            <h1 className="display-title max-w-3xl text-4xl leading-[1.02] font-bold tracking-tight text-[var(--sea-ink)] sm:text-5xl">
               {store?.name ?? 'Loading today’s menu...'}
             </h1>
-            <p className="max-w-2xl text-[var(--sea-ink-soft)] text-sm sm:text-base">
+            <p className="max-w-2xl text-sm text-[var(--sea-ink-soft)] sm:text-base">
               Browse a single-store menu powered by the new `menu` context. Categories, item
               filters, and prices now come from the API instead of placeholder copy.
             </p>
@@ -88,10 +90,10 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
 
           <div className="island-shell rounded-[1.75rem] p-5">
             <p className="island-kicker mb-2">Selection</p>
-            <h2 className="mb-2 font-semibold text-[var(--sea-ink)] text-lg">
+            <h2 className="mb-2 text-lg font-semibold text-[var(--sea-ink)]">
               {activeCategory?.name ?? 'Everything on the menu'}
             </h2>
-            <p className="m-0 text-[var(--sea-ink-soft)] text-sm">
+            <p className="m-0 text-sm text-[var(--sea-ink-soft)]">
               {activeCategory?.description ??
                 'Choose a category to narrow the list, or stay on all items to inspect the full menu.'}
             </p>
@@ -122,11 +124,11 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="island-kicker mb-1">Live inventory</p>
-                  <h2 className="font-semibold text-2xl text-[var(--sea-ink)]">
+                  <h2 className="text-2xl font-semibold text-[var(--sea-ink)]">
                     {items.length} item{items.length === 1 ? '' : 's'}
                   </h2>
                 </div>
-                <p className="max-w-sm text-right text-[var(--sea-ink-soft)] text-sm">
+                <p className="max-w-sm text-right text-sm text-[var(--sea-ink-soft)]">
                   Sorted by the backend `sort_order`, then rendered as responsive cards for mobile
                   and desktop.
                 </p>
@@ -141,26 +143,26 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
                   >
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
-                        <p className="mb-2 inline-flex rounded-full border border-[rgba(50,143,151,0.18)] bg-[rgba(79,184,178,0.1)] px-2.5 py-1 font-semibold text-[var(--lagoon-deep)] text-xs uppercase tracking-[0.18em]">
+                        <p className="mb-2 inline-flex rounded-full border border-[rgba(50,143,151,0.18)] bg-[rgba(79,184,178,0.1)] px-2.5 py-1 text-xs font-semibold tracking-[0.18em] text-[var(--lagoon-deep)] uppercase">
                           {resolveCategoryName(item.category_id, categories)}
                         </p>
-                        <h3 className="font-semibold text-[var(--sea-ink)] text-xl">{item.name}</h3>
+                        <h3 className="text-xl font-semibold text-[var(--sea-ink)]">{item.name}</h3>
                       </div>
-                      <p className="rounded-full border border-[rgba(47,106,74,0.18)] bg-[rgba(47,106,74,0.12)] px-3 py-1 font-semibold text-[var(--sea-ink)] text-sm">
+                      <p className="rounded-full border border-[rgba(47,106,74,0.18)] bg-[rgba(47,106,74,0.12)] px-3 py-1 text-sm font-semibold text-[var(--sea-ink)]">
                         {formatMenuPrice(item.price_amount, store?.currency_code)}
                       </p>
                     </div>
 
-                    <p className="mb-5 flex-1 text-[var(--sea-ink-soft)] text-sm leading-6">
+                    <p className="mb-5 flex-1 text-sm leading-6 text-[var(--sea-ink-soft)]">
                       {item.description ??
                         'No description yet. The API returned this item without extra copy.'}
                     </p>
 
-                    <div className="flex items-center justify-between gap-3 border-[var(--line)] border-t pt-4">
-                      <span className="text-[var(--sea-ink-soft)] text-xs uppercase tracking-[0.18em]">
+                    <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
+                      <span className="text-xs tracking-[0.18em] text-[var(--sea-ink-soft)] uppercase">
                         {item.slug}
                       </span>
-                      <span className="font-semibold text-[var(--lagoon-deep)] text-xs uppercase tracking-[0.16em]">
+                      <span className="text-xs font-semibold tracking-[0.16em] text-[var(--lagoon-deep)] uppercase">
                         {item.status}
                       </span>
                     </div>
@@ -198,7 +200,7 @@ function FilterButton({
       )}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold text-[var(--sea-ink)] text-sm">{label}</span>
+        <span className="text-sm font-semibold text-[var(--sea-ink)]">{label}</span>
         <span
           className={cn(
             'h-2.5 w-2.5 rounded-full transition',
@@ -207,7 +209,7 @@ function FilterButton({
         />
       </div>
       {description ? (
-        <p className="mt-2 text-[var(--sea-ink-soft)] text-xs leading-5">{description}</p>
+        <p className="mt-2 text-xs leading-5 text-[var(--sea-ink-soft)]">{description}</p>
       ) : null}
     </button>
   )
@@ -230,7 +232,7 @@ function StateCard({
       )}
     >
       <p className="island-kicker mb-2">{title}</p>
-      <p className="m-0 text-[var(--sea-ink-soft)] text-sm leading-6">{message}</p>
+      <p className="m-0 text-sm leading-6 text-[var(--sea-ink-soft)]">{message}</p>
     </div>
   )
 }

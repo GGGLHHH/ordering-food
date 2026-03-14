@@ -1,4 +1,5 @@
 import { useStore } from '@tanstack/react-form'
+
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
@@ -42,7 +43,7 @@ export function TextField({ label, placeholder }: { label: string; placeholder?:
 
   return (
     <div>
-      <Label htmlFor={label} className="mb-2 font-bold text-xl">
+      <Label htmlFor={label} className="mb-2 text-xl font-bold">
         {label}
       </Label>
       <Input
@@ -62,7 +63,7 @@ export function TextArea({ label, rows = 3 }: { label: string; rows?: number }) 
 
   return (
     <div>
-      <Label htmlFor={label} className="mb-2 font-bold text-xl">
+      <Label htmlFor={label} className="mb-2 text-xl font-bold">
         {label}
       </Label>
       <ShadcnTextarea
@@ -125,7 +126,7 @@ export function Slider({ label }: { label: string }) {
 
   return (
     <div>
-      <Label htmlFor={label} className="mb-2 font-bold text-xl">
+      <Label htmlFor={label} className="mb-2 text-xl font-bold">
         {label}
       </Label>
       <ShadcnSlider

@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
+
 import { RegisterForm } from '#/features/identity/register-form'
 
 const registerSearchSchema = z.object({

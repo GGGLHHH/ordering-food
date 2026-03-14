@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
+
 import { LoginForm } from '#/features/auth/login-form'
 
 const loginSearchSchema = z.object({

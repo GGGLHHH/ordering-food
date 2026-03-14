@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
+
 import { ApiError } from '#/integrations/http'
 
 const MAX_QUERY_RETRIES = 3

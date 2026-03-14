@@ -1,5 +1,7 @@
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
+
 import type { ExampleItemPath, ExamplePayload, ExampleSearchQuery } from '#/contracts/generated'
+
 import { echoExamplePayload, getExampleItem, searchExamples } from './api'
 
 export const exampleKeys = {

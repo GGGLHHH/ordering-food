@@ -1,9 +1,11 @@
 import { mutationOptions, queryOptions, useMutation } from '@tanstack/react-query'
+
 import type {
   BindIdentityUserIdentityRequest,
   CreateIdentityUserRequest,
   UpdateIdentityUserProfileRequest,
 } from '#/contracts/generated'
+
 import {
   bindIdentityUserIdentity,
   createIdentityUser,
