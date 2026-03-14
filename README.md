@@ -4,7 +4,7 @@ Rust backend API scaffold for the `server` workspace, now organized as a strict 
 
 ## Workspace layout
 
-`server` is the Cargo workspace root and currently contains the first bounded context blueprint:
+`server` is the Cargo workspace root and currently contains these bounded-context and platform crates:
 
 - `apps/api`: the only HTTP entrypoint, responsible for Axum startup, routing, OpenAPI, config, and app-specific composition
 - `crates/bootstrap-core`: shared runtime registry kernel for context descriptors, topology planning, migrations, and bootstrap ordering
@@ -12,6 +12,10 @@ Rust backend API scaffold for the `server` workspace, now organized as a strict 
 - `crates/identity-domain`: pure user-domain model and invariants
 - `crates/identity-application`: user use cases and ports
 - `crates/identity-infrastructure-sqlx`: SQLx persistence, query read model, and migrations
+- `crates/identity-infrastructure-auth`: password hashing, JWT token service, and Redis-backed refresh token storage
+- `crates/menu-domain`: menu/store/category/item domain model and invariants
+- `crates/menu-application`: menu use cases and query services
+- `crates/menu-infrastructure-sqlx`: SQLx persistence, query read model, and migrations for the menu context
 
 Within `apps/api`, only `src/composition/**` may depend directly on infrastructure crates. Route handlers and HTTP adapters must stay decoupled from SQLx implementations.
 
@@ -27,6 +31,7 @@ The `identity` context uses a dedicated PostgreSQL schema:
 - `identity.users`
 - `identity.user_profiles`
 - `identity.user_identities`
+- `identity.user_credentials`
 
 ## Prerequisites
 
@@ -55,10 +60,11 @@ This repository checks in project-level MCP configuration for common AI coding c
 - `.codex/config.toml` for Codex CLI and Codex IDE extension
 - `.mcp.json` for Claude Code
 
-The Codex and Claude project configurations both define these MCP servers:
+The checked-in project configurations define these MCP servers:
 
 - `dbhub` at `http://localhost:1000/mcp`
-- `gitnexus` via `vp dlx gitnexus@latest mcp`
+- `gitnexus` via `npx -y gitnexus@latest mcp` in `.codex/config.toml`
+- `gitnexus` via `vp dlx gitnexus@latest mcp` in `.mcp.json`
 
 Codex loads `.codex/config.toml` only for trusted projects. If Codex reports that project config is disabled, trust the repository once in the TUI or add a user-level trust entry to `~/.codex/config.toml`:
 
@@ -82,7 +88,7 @@ This repository also mirrors the Claude `gitnexus` skills into project-level Cod
 make run
 ```
 
-`make run` uses Bacon and runs the workspace binary package:
+`make run` starts Bacon, and the default Bacon job runs the workspace binary package:
 
 ```bash
 cargo run -p ordering-food-api --bin ordering-food-server
@@ -173,14 +179,22 @@ The internal Nginx container listens on `127.0.0.1:18081` and is intended to sit
 - `POST /api/examples/echo`
 - `GET /api/examples/search?page=1`
 - `GET /api/examples/items/{item_id}`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 - `POST /api/identity/users`
 - `GET /api/identity/users/{user_id}`
 - `PATCH /api/identity/users/{user_id}/profile`
 - `POST /api/identity/users/{user_id}/identities`
 - `POST /api/identity/users/{user_id}/disable`
 - `POST /api/identity/users/{user_id}/soft-delete`
+- `GET /api/menu/store`
+- `GET /api/menu/categories`
+- `GET /api/menu/items`
+- `GET /api/menu/items/{item_id}`
 
-The first phase wires the `identity` context end-to-end internally without exposing public business endpoints yet.
+The API currently exposes example endpoints, `identity` user-management endpoints, `auth` session endpoints, and `menu` read endpoints. Cart, checkout, and order-management flows are not implemented yet.
 
 ## Export frontend TypeScript bindings
 
@@ -189,7 +203,7 @@ The repository uses `ts-rs` from the API contract layer as the single source of 
 - Only public HTTP contract types are exported to TypeScript
 - Domain, application, infrastructure, runtime, and config types stay backend-internal
 - Future business endpoints should define frontend-facing DTOs in `apps/api` and map them to application/domain models explicitly
-- The `identity` endpoints already follow this pattern and export their request/response contracts via `ts-rs`
+- The `identity`, `auth`, `menu`, health, and example endpoints already follow this pattern and export their request/response contracts via `ts-rs`
 
 Set `GENERATED_API_DIR` before exporting bindings. The checked-in root `.env` uses the default local path `../frontend/src/contracts/generated`, and `make export-ts` forwards that environment variable into the export binary.
 
@@ -217,6 +231,11 @@ The server automatically loads the root `.env` file on startup and then applies 
 - `DATABASE__URL`
 - `DATABASE__MAX_CONNECTIONS`
 - `REDIS__URL`
+- `AUTH__JWT_SECRET`
+- `AUTH__ACCESS_TOKEN_TTL_SECONDS`
+- `AUTH__REFRESH_TOKEN_TTL_SECONDS`
+- `AUTH__COOKIE_DOMAIN`
+- `AUTH__COOKIE_SECURE`
 
 Default local development values live in the root `.env` file.
 
