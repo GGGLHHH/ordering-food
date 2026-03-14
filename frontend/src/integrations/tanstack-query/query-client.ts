@@ -19,10 +19,6 @@ export function createAppQueryClient() {
 }
 
 export function getQueryClient() {
-  if (typeof window === 'undefined') {
-    return createAppQueryClient()
-  }
-
   browserQueryClient ??= createAppQueryClient()
   return browserQueryClient
 }

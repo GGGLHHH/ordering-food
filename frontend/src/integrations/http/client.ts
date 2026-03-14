@@ -43,10 +43,9 @@ export interface ApiClient {
 let browserApiClient: ApiClient | undefined
 
 export function createApiClient(context: ApiClientContext = {}): ApiClient {
-  const isBrowser = typeof window !== 'undefined'
-  const baseUrl = resolveBaseUrl(context.baseUrl, isBrowser)
+  const baseUrl = resolveBaseUrl(context.baseUrl)
   const client = ky.create({
-    credentials: isBrowser ? 'include' : undefined,
+    credentials: 'include',
     fetch: context.fetch,
     headers: context.headers,
     retry: 0,
@@ -78,7 +77,7 @@ export function createApiClient(context: ApiClientContext = {}): ApiClient {
     try {
       return await client(buildUrl(baseUrl, normalizedPath), buildKyOptions(options))
     } catch (error) {
-      if (shouldRefreshSession(error, normalizedPath, options, isBrowser)) {
+      if (shouldRefreshSession(error, normalizedPath, options)) {
         try {
           refreshPromise ??= refreshSession(client, baseUrl)
           await refreshPromise
@@ -132,12 +131,6 @@ export function requestVoid(path: string, options: ApiRequestOptions = {}): Prom
 }
 
 function getBrowserApiClient(): ApiClient {
-  if (typeof window === 'undefined') {
-    throw new Error(
-      'The default browser API client is unavailable during SSR. Use createApiClient with an absolute baseUrl and inbound headers instead.',
-    )
-  }
-
   browserApiClient ??= createApiClient()
   return browserApiClient
 }
@@ -188,9 +181,8 @@ function shouldRefreshSession(
   error: unknown,
   path: string,
   options: InternalApiRequestOptions,
-  isBrowser: boolean,
 ): boolean {
-  if (!isBrowser || !(error instanceof HTTPError)) {
+  if (!(error instanceof HTTPError)) {
     return false
   }
 
@@ -229,29 +221,19 @@ function normalizePath(path: string): string {
   return path.replace(/^\/+/, '')
 }
 
-function resolveBaseUrl(baseUrl: string | undefined, isBrowser: boolean): string {
+function resolveBaseUrl(baseUrl: string | undefined): string {
   if (baseUrl) {
-    if (isBrowser && baseUrl.startsWith('/')) {
+    if (baseUrl.startsWith('/')) {
       return new URL(baseUrl, window.location.origin).toString().replace(/\/+$/, '')
     }
 
     return baseUrl
   }
 
-  if (isBrowser) {
-    return new URL('/api', window.location.origin).toString().replace(/\/+$/, '')
-  }
-
-  throw new Error(
-    'SSR API clients require an absolute baseUrl, for example http://127.0.0.1:8080/api.',
-  )
+  return new URL('/api', window.location.origin).toString().replace(/\/+$/, '')
 }
 
 function redirectToLogin(onAuthRedirect?: (href: string) => void) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
   const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (window.location.pathname === '/login') {
     return
