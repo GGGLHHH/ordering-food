@@ -4,6 +4,8 @@ use crate::composition::{
     platform::ApiPlatform,
 };
 use crate::routes::orders::{self, OrderApiDoc};
+use ordering_food_authz_application::AuthorizationService;
+use ordering_food_authz_infrastructure_sqlx::SqlxAuthorizationRepository;
 use ordering_food_bootstrap_core::{BootstrapRegistration, ContextDescriptor};
 use ordering_food_identity_application::TokenService;
 use ordering_food_identity_infrastructure_auth::JwtTokenService;
@@ -35,6 +37,7 @@ fn order_bootstrap_registration(
         });
         let id_generator = Arc::new(UuidV4OrderIdGenerator);
         let auth_settings = platform.settings.auth.clone();
+        let authz_repository = Arc::new(SqlxAuthorizationRepository::new(platform.pg_pool.clone()));
         async move {
             let module = build_order_module(pg_pool, clock, id_generator);
             let token_service: Arc<dyn TokenService> = Arc::new(JwtTokenService::new(
@@ -42,6 +45,7 @@ fn order_bootstrap_registration(
                 auth_settings.access_token_ttl_seconds,
                 auth_settings.refresh_token_ttl_seconds,
             ));
+            let authz = Arc::new(AuthorizationService::new(authz_repository));
 
             let mut contribution = ApiContextContribution::empty(context_id);
             contribution.add_readiness_check(ApiNamedReadinessCheck::always_ok(
@@ -50,7 +54,9 @@ fn order_bootstrap_registration(
             ));
             contribution.add_route_mount(
                 orders::ORDER_ROUTE_PREFIX,
-                orders::router(module.clone()).layer(axum::Extension(token_service)),
+                orders::router(module.clone())
+                    .layer(axum::Extension(authz))
+                    .layer(axum::Extension(token_service)),
             );
             contribution.add_openapi_document(OrderApiDoc::openapi());
             contribution.retain_private(module);

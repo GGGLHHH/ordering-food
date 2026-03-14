@@ -8,6 +8,7 @@ use axum::{
     extract::DefaultBodyLimit,
     routing::{get, post},
 };
+use ordering_food_authz_application::AuthorizationService;
 use ordering_food_order_application::{
     AcceptOrderInput, ApplicationError, CancelOrderByCustomerInput, CompleteOrderInput,
     MarkOrderReadyForPickupInput, OrderModule, PlaceOrderFromCartInput,
@@ -256,14 +257,25 @@ pub async fn cancel_order(
 )]
 pub async fn accept_order(
     Extension(module): Extension<Arc<OrderModule>>,
+    Extension(authz): Extension<Arc<AuthorizationService>>,
     context: RequestContext,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     ApiPath(path): ApiPath<OrderPath>,
 ) -> Result<Json<OrderResponse>, AppError> {
+    authorize_store_action(
+        &module,
+        &authz,
+        &path.order_id,
+        &user.user_id,
+        context.request_id.clone(),
+    )
+    .await?;
+
     module
         .accept_order
         .execute(AcceptOrderInput {
             order_id: path.order_id.clone(),
+            actor_user_id: user.user_id,
         })
         .await
         .map_err(|error| map_order_error(error, context.request_id.clone()))?;
@@ -288,14 +300,25 @@ pub async fn accept_order(
 )]
 pub async fn start_preparing_order(
     Extension(module): Extension<Arc<OrderModule>>,
+    Extension(authz): Extension<Arc<AuthorizationService>>,
     context: RequestContext,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     ApiPath(path): ApiPath<OrderPath>,
 ) -> Result<Json<OrderResponse>, AppError> {
+    authorize_store_action(
+        &module,
+        &authz,
+        &path.order_id,
+        &user.user_id,
+        context.request_id.clone(),
+    )
+    .await?;
+
     module
         .start_preparing_order
         .execute(StartPreparingOrderInput {
             order_id: path.order_id.clone(),
+            actor_user_id: user.user_id,
         })
         .await
         .map_err(|error| map_order_error(error, context.request_id.clone()))?;
@@ -320,14 +343,25 @@ pub async fn start_preparing_order(
 )]
 pub async fn mark_order_ready(
     Extension(module): Extension<Arc<OrderModule>>,
+    Extension(authz): Extension<Arc<AuthorizationService>>,
     context: RequestContext,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     ApiPath(path): ApiPath<OrderPath>,
 ) -> Result<Json<OrderResponse>, AppError> {
+    authorize_store_action(
+        &module,
+        &authz,
+        &path.order_id,
+        &user.user_id,
+        context.request_id.clone(),
+    )
+    .await?;
+
     module
         .mark_order_ready_for_pickup
         .execute(MarkOrderReadyForPickupInput {
             order_id: path.order_id.clone(),
+            actor_user_id: user.user_id,
         })
         .await
         .map_err(|error| map_order_error(error, context.request_id.clone()))?;
@@ -352,14 +386,25 @@ pub async fn mark_order_ready(
 )]
 pub async fn complete_order(
     Extension(module): Extension<Arc<OrderModule>>,
+    Extension(authz): Extension<Arc<AuthorizationService>>,
     context: RequestContext,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     ApiPath(path): ApiPath<OrderPath>,
 ) -> Result<Json<OrderResponse>, AppError> {
+    authorize_store_action(
+        &module,
+        &authz,
+        &path.order_id,
+        &user.user_id,
+        context.request_id.clone(),
+    )
+    .await?;
+
     module
         .complete_order
         .execute(CompleteOrderInput {
             order_id: path.order_id.clone(),
+            actor_user_id: user.user_id,
         })
         .await
         .map_err(|error| map_order_error(error, context.request_id.clone()))?;
@@ -384,14 +429,25 @@ pub async fn complete_order(
 )]
 pub async fn reject_order(
     Extension(module): Extension<Arc<OrderModule>>,
+    Extension(authz): Extension<Arc<AuthorizationService>>,
     context: RequestContext,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     ApiPath(path): ApiPath<OrderPath>,
 ) -> Result<Json<OrderResponse>, AppError> {
+    authorize_store_action(
+        &module,
+        &authz,
+        &path.order_id,
+        &user.user_id,
+        context.request_id.clone(),
+    )
+    .await?;
+
     module
         .reject_order_by_store
         .execute(RejectOrderByStoreInput {
             order_id: path.order_id.clone(),
+            actor_user_id: user.user_id,
         })
         .await
         .map_err(|error| map_order_error(error, context.request_id.clone()))?;
@@ -420,6 +476,36 @@ async fn load_order_response(
     }
 
     map_order_response(order).map_err(|error| error.with_request_id(request_id))
+}
+
+async fn authorize_store_action(
+    module: &OrderModule,
+    authz: &AuthorizationService,
+    order_id: &str,
+    user_id: &str,
+    request_id: Option<String>,
+) -> Result<(), AppError> {
+    let order = module
+        .order_queries
+        .get_by_id(&OrderId::new(order_id.to_string()))
+        .await
+        .map_err(|error| map_order_error(error, request_id.clone()))?
+        .ok_or_else(|| {
+            AppError::not_found("order was not found").with_request_id(request_id.clone())
+        })?;
+
+    let authorized = authz
+        .can_manage_order(user_id, &order.store_id)
+        .await
+        .map_err(|_| {
+            AppError::internal("internal server error").with_request_id(request_id.clone())
+        })?;
+
+    if !authorized {
+        return Err(AppError::not_found("order was not found").with_request_id(request_id));
+    }
+
+    Ok(())
 }
 
 fn map_order_response(
@@ -486,6 +572,10 @@ mod tests {
         http::{HeaderName, Request, StatusCode},
         response::Response,
     };
+    use ordering_food_authz_application::{
+        ApplicationError as AuthzApplicationError, AuthorizationRepository, AuthorizationService,
+    };
+    use ordering_food_authz_domain::{GlobalRole, StoreRole};
     use ordering_food_identity_application::{AccessTokenClaims, TokenPair, TokenService};
     use ordering_food_order_application::{
         Clock, IdGenerator, OrderItemReadModel, OrderModule, OrderReadModel, OrderReadRepository,
@@ -690,7 +780,50 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FakeAuthorizationRepository {
+        global_roles: Mutex<HashMap<String, Vec<GlobalRole>>>,
+        store_roles: Mutex<HashMap<(String, String), Vec<StoreRole>>>,
+    }
+
+    #[async_trait]
+    impl AuthorizationRepository for FakeAuthorizationRepository {
+        async fn get_global_roles(
+            &self,
+            user_id: &str,
+        ) -> Result<Vec<GlobalRole>, AuthzApplicationError> {
+            Ok(self
+                .global_roles
+                .lock()
+                .unwrap()
+                .get(user_id)
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        async fn get_store_roles(
+            &self,
+            user_id: &str,
+            store_id: &str,
+        ) -> Result<Vec<StoreRole>, AuthzApplicationError> {
+            Ok(self
+                .store_roles
+                .lock()
+                .unwrap()
+                .get(&(user_id.to_string(), store_id.to_string()))
+                .cloned()
+                .unwrap_or_default())
+        }
+    }
+
     fn build_test_app(repository: Arc<InMemoryOrderRepository>) -> Router {
+        build_test_app_with_authz(repository, Arc::new(FakeAuthorizationRepository::default()))
+    }
+
+    fn build_test_app_with_authz(
+        repository: Arc<InMemoryOrderRepository>,
+        authz_repository: Arc<FakeAuthorizationRepository>,
+    ) -> Router {
         let module = Arc::new(OrderModule::new(
             repository.clone(),
             repository,
@@ -702,11 +835,14 @@ mod tests {
         ));
         let request_id_header = HeaderName::from_static("x-request-id");
         let token_service: Arc<dyn TokenService> = Arc::new(FakeTokenService);
+        let authz_service = Arc::new(AuthorizationService::new(authz_repository));
 
         Router::new()
             .nest(
                 ORDER_ROUTE_PREFIX,
-                router(module).layer(Extension(token_service)),
+                router(module)
+                    .layer(Extension(authz_service))
+                    .layer(Extension(token_service)),
             )
             .fallback(http::not_found)
             .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
@@ -841,7 +977,12 @@ mod tests {
             "customer-1",
             OrderStatus::PendingAcceptance,
         ));
-        let app = build_test_app(repository.clone());
+        let authz = Arc::new(FakeAuthorizationRepository::default());
+        authz.store_roles.lock().unwrap().insert(
+            ("merchant-1".to_string(), "store-1".to_string()),
+            vec![StoreRole::StoreStaff],
+        );
+        let app = build_test_app_with_authz(repository.clone(), authz);
 
         for (path, expected_status) in [
             ("/api/orders/order-1/accept", "accepted"),
@@ -866,5 +1007,179 @@ mod tests {
             let body = response_json(response).await;
             assert_eq!(body["status"], expected_status);
         }
+    }
+
+    #[tokio::test]
+    async fn merchant_actions_require_role_membership() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order(
+            "order-1",
+            "customer-1",
+            OrderStatus::PendingAcceptance,
+        ));
+        let app = build_test_app(repository);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/accept")
+                    .header("cookie", "access_token=token-bob")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn platform_admin_can_manage_any_order() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order(
+            "order-1",
+            "customer-1",
+            OrderStatus::PendingAcceptance,
+        ));
+        let authz = Arc::new(FakeAuthorizationRepository::default());
+        authz
+            .global_roles
+            .lock()
+            .unwrap()
+            .insert("admin-1".to_string(), vec![GlobalRole::PlatformAdmin]);
+        let app = build_test_app_with_authz(repository, authz);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/accept")
+                    .header("cookie", "access_token=token-admin-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn store_membership_is_scoped_to_matching_store() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order(
+            "order-1",
+            "customer-1",
+            OrderStatus::PendingAcceptance,
+        ));
+        let authz = Arc::new(FakeAuthorizationRepository::default());
+        authz.store_roles.lock().unwrap().insert(
+            ("merchant-1".to_string(), "other-store".to_string()),
+            vec![StoreRole::StoreOwner],
+        );
+        let app = build_test_app_with_authz(repository, authz);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/accept")
+                    .header("cookie", "access_token=token-merchant-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn store_owner_can_manage_store_order() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order(
+            "order-1",
+            "customer-1",
+            OrderStatus::PendingAcceptance,
+        ));
+        let authz = Arc::new(FakeAuthorizationRepository::default());
+        authz.store_roles.lock().unwrap().insert(
+            ("owner-1".to_string(), "store-1".to_string()),
+            vec![StoreRole::StoreOwner],
+        );
+        let app = build_test_app_with_authz(repository, authz);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/reject")
+                    .header("cookie", "access_token=token-owner-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response_json(response).await;
+        assert_eq!(body["status"], "rejected_by_store");
+    }
+
+    #[tokio::test]
+    async fn authorized_store_staff_still_gets_conflict_for_invalid_ready_transition() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order(
+            "order-1",
+            "customer-1",
+            OrderStatus::PendingAcceptance,
+        ));
+        let authz = Arc::new(FakeAuthorizationRepository::default());
+        authz.store_roles.lock().unwrap().insert(
+            ("merchant-1".to_string(), "store-1".to_string()),
+            vec![StoreRole::StoreStaff],
+        );
+        let app = build_test_app_with_authz(repository, authz);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/ready")
+                    .header("cookie", "access_token=token-merchant-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn authorized_store_staff_still_gets_conflict_for_invalid_complete_transition() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order("order-1", "customer-1", OrderStatus::Accepted));
+        let authz = Arc::new(FakeAuthorizationRepository::default());
+        authz.store_roles.lock().unwrap().insert(
+            ("merchant-1".to_string(), "store-1".to_string()),
+            vec![StoreRole::StoreStaff],
+        );
+        let app = build_test_app_with_authz(repository, authz);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/complete")
+                    .header("cookie", "access_token=token-merchant-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 }

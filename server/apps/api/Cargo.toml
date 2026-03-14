@@ -27,6 +27,9 @@ ordering-food-order-application = { path = "../../crates/order-application" }
 ordering-food-order-domain = { path = "../../crates/order-domain" }
 ordering-food-order-infrastructure-sqlx = { path = "../../crates/order-infrastructure-sqlx" }
 ordering-food-bootstrap-core = { path = "../../crates/bootstrap-core" }
+ordering-food-authz-application = { path = "../../crates/authz-application" }
+ordering-food-authz-domain = { path = "../../crates/authz-domain" }
+ordering-food-authz-infrastructure-sqlx = { path = "../../crates/authz-infrastructure-sqlx" }
 ordering-food-shared-kernel = { path = "../../crates/shared-kernel" }
 redis.workspace = true
 serde.workspace = true

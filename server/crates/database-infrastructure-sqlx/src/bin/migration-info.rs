@@ -149,13 +149,16 @@ mod tests {
     fn build_status_lines_marks_unapplied_migrations_as_pending() {
         let lines = build_status_lines(&[]).unwrap();
 
-        assert_eq!(lines.len(), 2);
+        assert_eq!(lines.len(), 3);
         assert_eq!(lines[0].version, 202603140001);
         assert_eq!(lines[0].status, "pending");
         assert_eq!(lines[0].description, "baseline");
         assert_eq!(lines[1].version, 202603150001);
         assert_eq!(lines[1].status, "pending");
         assert_eq!(lines[1].description, "ordering");
+        assert_eq!(lines[2].version, 202603150002);
+        assert_eq!(lines[2].status, "pending");
+        assert_eq!(lines[2].description, "authz");
     }
 
     #[test]

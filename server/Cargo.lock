@@ -1207,6 +1207,9 @@ dependencies = [
  "axum",
  "config",
  "dotenvy",
+ "ordering-food-authz-application",
+ "ordering-food-authz-domain",
+ "ordering-food-authz-infrastructure-sqlx",
  "ordering-food-bootstrap-core",
  "ordering-food-database-infrastructure-sqlx",
  "ordering-food-identity-application",
@@ -1237,6 +1240,37 @@ dependencies = [
  "ts-rs",
  "utoipa",
  "utoipa-swagger-ui",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-authz-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-authz-domain",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-authz-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "thiserror",
+]
+
+[[package]]
+name = "ordering-food-authz-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-authz-application",
+ "ordering-food-authz-domain",
+ "ordering-food-database-infrastructure-sqlx",
+ "sqlx",
+ "time",
  "uuid",
 ]
 

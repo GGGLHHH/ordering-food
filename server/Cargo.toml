@@ -1,6 +1,9 @@
 [workspace]
 members = [
     "apps/api",
+    "crates/authz-domain",
+    "crates/authz-application",
+    "crates/authz-infrastructure-sqlx",
     "crates/database-infrastructure-sqlx",
     "crates/order-domain",
     "crates/order-application",

@@ -5,6 +5,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompleteOrderInput {
     pub order_id: String,
+    pub actor_user_id: String,
 }
 
 pub struct CompleteOrder {
