@@ -63,13 +63,13 @@ const config = defineConfig({
     tsconfigPaths: true,
   },
   plugins: [
+    codeInspectorPlugin({
+      bundler: 'vite',
+    }),
     devtools(),
     tanstackRouter(),
     tailwindcss(),
     viteReact(),
-    codeInspectorPlugin({
-      bundler: 'vite',
-    }),
   ],
   server: {
     proxy: {
