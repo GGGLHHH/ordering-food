@@ -2,7 +2,7 @@
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import { ApiError } from '#/integrations/http'
 import { createAppQueryClient, shouldRetryQuery } from '#/integrations/tanstack-query/query-client'
 import { authKeys, useAuthSessionQuery, useLogoutMutation } from './queries'

@@ -18,10 +18,9 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
   const categories = categoriesQuery.data?.categories ?? []
   const items = itemsQuery.data?.items ?? []
   const activeCategorySlug = deferredCategorySlug?.trim() || undefined
-  const activeCategory =
-    activeCategorySlug
-      ? categories.find((category) => category.slug === activeCategorySlug)
-      : undefined
+  const activeCategory = activeCategorySlug
+    ? categories.find((category) => category.slug === activeCategorySlug)
+    : undefined
   const isLoading = storeQuery.isPending || categoriesQuery.isPending || itemsQuery.isPending
   const hasError = storeQuery.error || categoriesQuery.error || itemsQuery.error
 
@@ -51,9 +50,7 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="text-[var(--sea-ink-soft)]">Timezone</dt>
-              <dd className="font-semibold text-[var(--sea-ink)]">
-                {store?.timezone ?? '--'}
-              </dd>
+              <dd className="font-semibold text-[var(--sea-ink)]">{store?.timezone ?? '--'}</dd>
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="text-[var(--sea-ink-soft)]">Visible categories</dt>
@@ -110,11 +107,7 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
           ) : null}
 
           {hasError ? (
-            <StateCard
-              message={formatMenuError(hasError)}
-              title="Menu unavailable"
-              tone="danger"
-            />
+            <StateCard message={formatMenuError(hasError)} title="Menu unavailable" tone="danger" />
           ) : null}
 
           {!isLoading && !hasError && items.length === 0 ? (
@@ -129,7 +122,7 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="island-kicker mb-1">Live inventory</p>
-                  <h2 className="font-semibold text-[var(--sea-ink)] text-2xl">
+                  <h2 className="font-semibold text-2xl text-[var(--sea-ink)]">
                     {items.length} item{items.length === 1 ? '' : 's'}
                   </h2>
                 </div>
@@ -151,9 +144,7 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
                         <p className="mb-2 inline-flex rounded-full border border-[rgba(50,143,151,0.18)] bg-[rgba(79,184,178,0.1)] px-2.5 py-1 font-semibold text-[var(--lagoon-deep)] text-xs uppercase tracking-[0.18em]">
                           {resolveCategoryName(item.category_id, categories)}
                         </p>
-                        <h3 className="font-semibold text-[var(--sea-ink)] text-xl">
-                          {item.name}
-                        </h3>
+                        <h3 className="font-semibold text-[var(--sea-ink)] text-xl">{item.name}</h3>
                       </div>
                       <p className="rounded-full border border-[rgba(47,106,74,0.18)] bg-[rgba(47,106,74,0.12)] px-3 py-1 font-semibold text-[var(--sea-ink)] text-sm">
                         {formatMenuPrice(item.price_amount, store?.currency_code)}
@@ -161,7 +152,8 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
                     </div>
 
                     <p className="mb-5 flex-1 text-[var(--sea-ink-soft)] text-sm leading-6">
-                      {item.description ?? 'No description yet. The API returned this item without extra copy.'}
+                      {item.description ??
+                        'No description yet. The API returned this item without extra copy.'}
                     </p>
 
                     <div className="flex items-center justify-between gap-3 border-[var(--line)] border-t pt-4">
@@ -234,9 +226,7 @@ function StateCard({
     <div
       className={cn(
         'island-shell rounded-[1.75rem] p-6',
-        tone === 'danger'
-          ? 'border-[rgba(190,74,65,0.2)] bg-[rgba(190,74,65,0.08)]'
-          : undefined,
+        tone === 'danger' ? 'border-[rgba(190,74,65,0.2)] bg-[rgba(190,74,65,0.08)]' : undefined,
       )}
     >
       <p className="island-kicker mb-2">{title}</p>
