@@ -1,3 +1,4 @@
+use ordering_food_database_infrastructure_sqlx::MIGRATOR;
 use ordering_food_identity_application::{
     ApplicationError, CredentialRepository, TransactionManager, UserReadRepository, UserRepository,
 };
@@ -5,8 +6,7 @@ use ordering_food_identity_domain::{
     IdentityType, NormalizedIdentifier, User, UserId, UserIdentity, UserProfile, UserStatus,
 };
 use ordering_food_identity_infrastructure_sqlx::{
-    MIGRATOR, SqlxCredentialRepository, SqlxTransactionManager, SqlxUserReadRepository,
-    SqlxUserRepository,
+    SqlxCredentialRepository, SqlxTransactionManager, SqlxUserReadRepository, SqlxUserRepository,
 };
 use ordering_food_shared_kernel::{Identifier, Timestamp};
 use sqlx::{PgPool, Row, types::time::OffsetDateTime};

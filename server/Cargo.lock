@@ -1208,6 +1208,7 @@ dependencies = [
  "config",
  "dotenvy",
  "ordering-food-bootstrap-core",
+ "ordering-food-database-infrastructure-sqlx",
  "ordering-food-identity-application",
  "ordering-food-identity-domain",
  "ordering-food-identity-infrastructure-auth",
@@ -1242,6 +1243,15 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-database-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sqlx",
  "tokio",
 ]
 
@@ -1286,6 +1296,7 @@ name = "ordering-food-identity-infrastructure-sqlx"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "ordering-food-database-infrastructure-sqlx",
  "ordering-food-identity-application",
  "ordering-food-identity-domain",
  "ordering-food-shared-kernel",
@@ -1320,6 +1331,7 @@ name = "ordering-food-menu-infrastructure-sqlx"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "ordering-food-database-infrastructure-sqlx",
  "ordering-food-menu-application",
  "ordering-food-menu-domain",
  "ordering-food-shared-kernel",

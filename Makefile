@@ -4,7 +4,7 @@ COMPOSE := docker compose
 SERVER_DIR := server
 ROOT_ENV_FILE := .env
 SQLX := cargo sqlx
-SQLX_MIGRATIONS_DIR := crates/identity-infrastructure-sqlx/migrations
+SQLX_MIGRATIONS_DIR := crates/database-infrastructure-sqlx/migrations
 INFRA_SERVICES := postgres redis dbhub
 FULL_STACK_SERVICES := $(INFRA_SERVICES) server frontend nginx autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
@@ -50,7 +50,7 @@ migration-create: ## Create a new reversible migration with NAME=<name>
 	cd $(SERVER_DIR) && $(SQLX) migrate add -r --source $(SQLX_MIGRATIONS_DIR) $(NAME)
 
 migration-info: ## Show database migration status with sqlx-cli
-	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' $(SQLX) migrate info --source $(SQLX_MIGRATIONS_DIR)
+	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' cargo run -p ordering-food-database-infrastructure-sqlx --bin migration-info
 
 fmt: ## Format Rust code
 	cd $(SERVER_DIR) && cargo fmt --all

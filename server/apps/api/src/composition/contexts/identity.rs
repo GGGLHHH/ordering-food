@@ -5,14 +5,12 @@ use crate::composition::{
 };
 use crate::routes::auth::{self, AuthApiDoc};
 use crate::routes::identity::{self, IdentityApiDoc};
-use ordering_food_bootstrap_core::{
-    BootstrapRegistration, ContextDescriptor, MigrationRegistration,
-};
+use ordering_food_bootstrap_core::{BootstrapRegistration, ContextDescriptor};
 use ordering_food_identity_application::TokenService;
 use ordering_food_identity_infrastructure_auth::{
     Argon2PasswordHasher, JwtTokenService, RedisRefreshTokenStore,
 };
-use ordering_food_identity_infrastructure_sqlx::{MIGRATOR, build_identity_module};
+use ordering_food_identity_infrastructure_sqlx::build_identity_module;
 use std::sync::Arc;
 use utoipa::OpenApi;
 
@@ -22,27 +20,7 @@ pub fn register_identity() -> ApiContextRegistration {
         depends_on: &[],
     };
 
-    ApiContextRegistration::new(
-        descriptor,
-        identity_migration_registration,
-        identity_bootstrap_registration,
-    )
-}
-
-fn identity_migration_registration(
-    descriptor: ContextDescriptor,
-) -> MigrationRegistration<ApiPlatform> {
-    MigrationRegistration::new(descriptor, move |platform: &ApiPlatform| {
-        let auto_migrate = platform.settings.app.auto_migrate;
-        let pg_pool = platform.pg_pool.clone();
-        async move {
-            if auto_migrate {
-                MIGRATOR.run(&pg_pool).await?;
-            }
-
-            Ok::<_, sqlx::migrate::MigrateError>(())
-        }
-    })
+    ApiContextRegistration::without_migration(descriptor, identity_bootstrap_registration)
 }
 
 fn identity_bootstrap_registration(

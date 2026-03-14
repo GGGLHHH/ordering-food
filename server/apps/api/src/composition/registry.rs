@@ -70,7 +70,7 @@ fn build_migration_registry(
     MigrationRegistry::new(
         registrations
             .iter()
-            .map(ApiContextRegistration::migration_registration)
+            .filter_map(ApiContextRegistration::migration_registration)
             .collect(),
     )
 }
@@ -245,6 +245,46 @@ mod tests {
                 .map(|descriptor| descriptor.id)
                 .collect::<Vec<_>>(),
             vec!["identity", "ordering"]
+        );
+    }
+
+    #[tokio::test]
+    async fn migration_registry_skips_contexts_without_migration_runner() {
+        fn bootstrap_registration(
+            descriptor: ContextDescriptor,
+        ) -> ordering_food_bootstrap_core::BootstrapRegistration<ApiPlatform, ApiContextContribution>
+        {
+            ordering_food_bootstrap_core::BootstrapRegistration::new(
+                descriptor,
+                move |_platform: &ApiPlatform| {
+                    let context_id = descriptor.id;
+                    async move { Ok::<_, std::io::Error>(ApiContextContribution::empty(context_id)) }
+                },
+            )
+        }
+
+        let registrations = vec![
+            ApiContextRegistration::without_migration(
+                ContextDescriptor {
+                    id: "menu",
+                    depends_on: &[],
+                },
+                bootstrap_registration,
+            ),
+            fake_registration(ContextDescriptor {
+                id: "identity",
+                depends_on: &[],
+            }),
+        ];
+
+        let migration_registry = build_migration_registry(&registrations).unwrap();
+        assert_eq!(
+            migration_registry
+                .descriptors()
+                .into_iter()
+                .map(|descriptor| descriptor.id)
+                .collect::<Vec<_>>(),
+            vec!["identity"]
         );
     }
 

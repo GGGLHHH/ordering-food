@@ -8,14 +8,15 @@ Rust backend API scaffold for the `server` workspace, now organized as a strict 
 
 - `apps/api`: the only HTTP entrypoint, responsible for Axum startup, routing, OpenAPI, config, and app-specific composition
 - `crates/bootstrap-core`: shared runtime registry kernel for context descriptors, topology planning, migrations, and bootstrap ordering
+- `crates/database-infrastructure-sqlx`: the single source of truth for SQLx migrations across all contexts
 - `crates/shared-kernel`: minimal cross-context primitives only
 - `crates/identity-domain`: pure user-domain model and invariants
 - `crates/identity-application`: user use cases and ports
-- `crates/identity-infrastructure-sqlx`: SQLx persistence, query read model, and migrations
+- `crates/identity-infrastructure-sqlx`: SQLx persistence and query read model
 - `crates/identity-infrastructure-auth`: password hashing, JWT token service, and Redis-backed refresh token storage
 - `crates/menu-domain`: menu/store/category/item domain model and invariants
 - `crates/menu-application`: menu use cases and query services
-- `crates/menu-infrastructure-sqlx`: SQLx persistence, query read model, and migrations for the menu context
+- `crates/menu-infrastructure-sqlx`: SQLx persistence and query read model for the menu context
 
 Within `apps/api`, only `src/composition/**` may depend directly on infrastructure crates. Route handlers and HTTP adapters must stay decoupled from SQLx implementations.
 
@@ -25,6 +26,9 @@ The API app now uses a multi-context composition pipeline:
 - `src/composition/context_registration.rs`: app-specific context registration contract
 - `src/composition/registry.rs`: migration/bootstrap orchestration plus lifecycle assembly
 - `src/composition/contexts/*.rs`: one adapter per bounded context
+
+Database migrations are now executed once through a dedicated platform-level `database` context.
+Business contexts such as `identity` and `menu` no longer own their own migration directories.
 
 The `identity` context uses a dedicated PostgreSQL schema:
 
@@ -156,7 +160,9 @@ make migration-down
 make migration-create NAME=add_identity_projection
 ```
 
-These commands invoke `cargo sqlx migrate ...` inside `/server`, with the source directory fixed to `crates/identity-infrastructure-sqlx/migrations`.
+`migration-up`、`migration-down`、`migration-create` use `cargo sqlx migrate ...` inside `/server`,
+with the source directory fixed to `crates/database-infrastructure-sqlx/migrations`.
+`migration-info` uses the shared migration crate directly so it reads the same single source of truth.
 
 ## Build a container image
 

@@ -5,7 +5,7 @@ use ordering_food_bootstrap_core::{
 
 pub struct ApiContextRegistration {
     descriptor: ContextDescriptor,
-    migration_factory: fn(ContextDescriptor) -> MigrationRegistration<ApiPlatform>,
+    migration_factory: Option<fn(ContextDescriptor) -> MigrationRegistration<ApiPlatform>>,
     bootstrap_factory:
         fn(ContextDescriptor) -> BootstrapRegistration<ApiPlatform, ApiContextContribution>,
 }
@@ -21,7 +21,21 @@ impl ApiContextRegistration {
     ) -> Self {
         Self {
             descriptor,
-            migration_factory,
+            migration_factory: Some(migration_factory),
+            bootstrap_factory,
+        }
+    }
+
+    pub fn without_migration(
+        descriptor: ContextDescriptor,
+        bootstrap_factory: fn(
+            ContextDescriptor,
+        )
+            -> BootstrapRegistration<ApiPlatform, ApiContextContribution>,
+    ) -> Self {
+        Self {
+            descriptor,
+            migration_factory: None,
             bootstrap_factory,
         }
     }
@@ -30,8 +44,9 @@ impl ApiContextRegistration {
         self.descriptor
     }
 
-    pub fn migration_registration(&self) -> MigrationRegistration<ApiPlatform> {
-        (self.migration_factory)(self.descriptor)
+    pub fn migration_registration(&self) -> Option<MigrationRegistration<ApiPlatform>> {
+        self.migration_factory
+            .map(|factory| factory(self.descriptor))
     }
 
     pub fn bootstrap_registration(

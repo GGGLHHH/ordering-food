@@ -1,3 +1,39 @@
+CREATE SCHEMA IF NOT EXISTS identity;
+
+CREATE TABLE identity.users (
+    id UUID PRIMARY KEY,
+    status TEXT NOT NULL CHECK (status IN ('active', 'disabled')),
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    deleted_at TIMESTAMPTZ NULL
+);
+
+CREATE TABLE identity.user_profiles (
+    user_id UUID PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    given_name TEXT NULL,
+    family_name TEXT NULL,
+    avatar_url TEXT NULL
+);
+
+CREATE TABLE identity.user_identities (
+    user_id UUID NOT NULL,
+    identity_type TEXT NOT NULL,
+    identifier_normalized TEXT NOT NULL,
+    bound_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_id, identity_type, identifier_normalized),
+    CONSTRAINT user_identities_identifier_unique UNIQUE (identity_type, identifier_normalized)
+);
+
+CREATE TABLE identity.user_credentials (
+    user_id UUID PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX idx_user_identities_user_id ON identity.user_identities (user_id);
+
 CREATE SCHEMA IF NOT EXISTS menu;
 
 CREATE TABLE menu.stores (
@@ -55,3 +91,4 @@ CREATE INDEX idx_menu_items_category_status_sort
 
 CREATE INDEX idx_menu_items_store_category_status_sort
     ON menu.items (store_id, category_id, status, sort_order, id);
+

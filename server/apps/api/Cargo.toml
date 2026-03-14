@@ -15,6 +15,7 @@ async-trait.workspace = true
 axum.workspace = true
 config.workspace = true
 dotenvy.workspace = true
+ordering-food-database-infrastructure-sqlx = { path = "../../crates/database-infrastructure-sqlx" }
 ordering-food-identity-application = { path = "../../crates/identity-application" }
 ordering-food-identity-domain = { path = "../../crates/identity-domain" }
 ordering-food-identity-infrastructure-auth = { path = "../../crates/identity-infrastructure-auth" }

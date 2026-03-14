@@ -91,7 +91,7 @@ mod tests {
     use super::*;
     use uuid::Uuid;
 
-    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    #[sqlx::test(migrator = "ordering_food_database_infrastructure_sqlx::MIGRATOR")]
     async fn commit_persists_changes(pool: PgPool) {
         let manager = SqlxTransactionManager::new(pool.clone());
         let user_id = Uuid::now_v7();
@@ -127,7 +127,7 @@ mod tests {
             .unwrap();
     }
 
-    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    #[sqlx::test(migrator = "ordering_food_database_infrastructure_sqlx::MIGRATOR")]
     async fn rollback_discards_changes(pool: PgPool) {
         let manager = SqlxTransactionManager::new(pool.clone());
         let user_id = Uuid::now_v7();

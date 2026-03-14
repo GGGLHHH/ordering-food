@@ -4,16 +4,14 @@ use crate::composition::{
     platform::ApiPlatform,
 };
 use crate::routes::menu::{self, MenuApiDoc};
-use ordering_food_bootstrap_core::{
-    BootstrapRegistration, ContextDescriptor, MigrationRegistration,
-};
+use ordering_food_bootstrap_core::{BootstrapRegistration, ContextDescriptor};
 use ordering_food_identity_application as identity_application;
 use ordering_food_menu_application::{
     ApplicationError as MenuApplicationError, Clock as MenuClock, CreateCategoryInput,
     CreateItemInput, CreateStoreInput, IdGenerator as MenuIdGenerator, MenuModule,
 };
 use ordering_food_menu_domain::{CategoryId, ItemId, MenuStatus, StoreId};
-use ordering_food_menu_infrastructure_sqlx::{MIGRATOR, build_menu_module};
+use ordering_food_menu_infrastructure_sqlx::build_menu_module;
 use ordering_food_shared_kernel::Timestamp;
 use std::sync::Arc;
 use tracing::info;
@@ -26,27 +24,7 @@ pub fn register_menu() -> ApiContextRegistration {
         depends_on: &[],
     };
 
-    ApiContextRegistration::new(
-        descriptor,
-        menu_migration_registration,
-        menu_bootstrap_registration,
-    )
-}
-
-fn menu_migration_registration(
-    descriptor: ContextDescriptor,
-) -> MigrationRegistration<ApiPlatform> {
-    MigrationRegistration::new(descriptor, move |platform: &ApiPlatform| {
-        let auto_migrate = platform.settings.app.auto_migrate;
-        let pg_pool = platform.pg_pool.clone();
-        async move {
-            if auto_migrate {
-                MIGRATOR.run(&pg_pool).await?;
-            }
-
-            Ok::<_, sqlx::migrate::MigrateError>(())
-        }
-    })
+    ApiContextRegistration::without_migration(descriptor, menu_bootstrap_registration)
 }
 
 fn menu_bootstrap_registration(
