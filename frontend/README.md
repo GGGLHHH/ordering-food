@@ -59,8 +59,7 @@ Use the `Link` component for SPA navigation:
 
 ```tsx
 import { Link } from '@tanstack/react-router'
-
-<Link to="/about">About</Link>
+;<Link to="/about">About</Link>
 ```
 
 More information: [TanStack Router docs](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts).
