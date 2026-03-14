@@ -3,7 +3,7 @@
 
 This project is indexed by GitNexus as **ordering-food** (3778 symbols, 7473 relationships, 200 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+> If any GitNexus tool warns the index is stale, run `vp dlx gitnexus analyze` in terminal first.
 
 ## Always Do
 
@@ -74,13 +74,13 @@ Before completing any code modification task, verify:
 After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
 
 ```bash
-npx gitnexus analyze
+vp dlx gitnexus analyze
 ```
 
 If the index previously included embeddings, preserve them by adding `--embeddings`:
 
 ```bash
-npx gitnexus analyze --embeddings
+vp dlx gitnexus analyze --embeddings
 ```
 
 To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
@@ -89,8 +89,8 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 ## CLI
 
-- Re-index: `npx gitnexus analyze`
-- Check freshness: `npx gitnexus status`
-- Generate docs: `npx gitnexus wiki`
+- Re-index: `vp dlx gitnexus analyze`
+- Check freshness: `vp dlx gitnexus status`
+- Generate docs: `vp dlx gitnexus wiki`
 
 <!-- gitnexus:end -->

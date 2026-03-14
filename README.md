@@ -58,7 +58,7 @@ This repository checks in project-level MCP configuration for common AI coding c
 The Codex and Claude project configurations both define these MCP servers:
 
 - `dbhub` at `http://localhost:1000/mcp`
-- `gitnexus` via `npx -y gitnexus@latest mcp`
+- `gitnexus` via `vp dlx gitnexus@latest mcp`
 
 Codex loads `.codex/config.toml` only for trusted projects. If Codex reports that project config is disabled, trust the repository once in the TUI or add a user-level trust entry to `~/.codex/config.toml`:
 
@@ -160,9 +160,9 @@ docker build -f server/Dockerfile -t ordering-food-server:local server
 
 The server runtime image defaults to `APP__HOST=0.0.0.0` and `APP__PORT=8080`. If you pass the root `.env` file into the container, override `APP__HOST` back to `0.0.0.0`, otherwise the server will only bind to the container loopback interface.
 
-The frontend container builds the TanStack Start app and runs the Nitro node server on port `3000`.
+The frontend container builds the React SPA with Vite+ and serves static files via Nginx on port `3000`.
 
-The internal Nginx container listens on `127.0.0.1:18081` and is intended to sit behind an external host-level Nginx that terminates HTTPS. It proxies only `/api/*` to the Rust API, proxies `/health` to the frontend Nitro server, and sends all other requests to the frontend app. The Rust API and frontend Nitro services are no longer published directly to the host; external traffic should enter through Nginx only. Backend readiness/docs endpoints remain internal to the Compose network.
+The internal Nginx container listens on `127.0.0.1:18081` and is intended to sit behind an external host-level Nginx that terminates HTTPS. It proxies only `/api/*` to the Rust API, proxies `/health` to the frontend container, and sends all other requests to the frontend app. The Rust API and frontend services are no longer published directly to the host; external traffic should enter through Nginx only. Backend readiness/docs endpoints remain internal to the Compose network.
 
 ## Available endpoints
 
