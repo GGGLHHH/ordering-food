@@ -3,6 +3,7 @@ pub mod auth;
 pub mod health;
 pub mod identity;
 pub mod menu;
+pub mod orders;
 
 use crate::{
     app::AppState,

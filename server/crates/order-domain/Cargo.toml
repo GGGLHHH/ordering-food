@@ -1,0 +1,15 @@
+[package]
+name = "ordering-food-order-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+statig.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+time.workspace = true
+

@@ -1,0 +1,19 @@
+[package]
+name = "ordering-food-order-infrastructure-sqlx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ordering-food-order-application = { path = "../order-application" }
+ordering-food-order-domain = { path = "../order-domain" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+ordering-food-database-infrastructure-sqlx = { path = "../database-infrastructure-sqlx" }
+time.workspace = true
+
