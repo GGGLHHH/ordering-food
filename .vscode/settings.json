@@ -10,7 +10,7 @@
     "**/frontend/src/routeTree.gen.ts": true
   },
   "editor.defaultFormatter": "oxc.oxc-vscode",
-  "oxc.fmt.configPath": "frontend/.oxfmtrc.json",
+  "oxc.fmt.configPath": "frontend/vite.config.ts",
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
   "editor.codeActionsOnSave": {

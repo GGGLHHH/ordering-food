@@ -45,6 +45,20 @@ const config = defineConfig({
       },
     ],
   },
+  fmt: {
+    printWidth: 100,
+    singleQuote: true,
+    semi: false,
+    trailingComma: 'all',
+    arrowParens: 'always',
+    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**'],
+    sortImports: {
+      internalPattern: ['#/*', '@/*'],
+    },
+    sortTailwindcss: {
+      functions: ['cn', 'clsx', 'cva'],
+    },
+  },
   resolve: {
     tsconfigPaths: true,
   },
