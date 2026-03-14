@@ -4,7 +4,7 @@ mod module;
 mod ports;
 pub mod use_cases;
 
-pub use dto::{OrderItemReadModel, OrderReadModel};
+pub use dto::{OrderItemReadModel, OrderListItemReadModel, OrderReadModel};
 pub use error::ApplicationError;
 pub use module::OrderModule;
 pub use ports::{

@@ -1,8 +1,11 @@
-import { useDeferredValue } from 'react'
+import { startTransition, useDeferredValue, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 
 import { ApiError } from '#/integrations/http'
 import { cn } from '#/lib/utils'
 
+import { useAuthSessionQuery } from '../auth/queries'
+import { readRecentOrderId, usePlaceOrderMutation, writeRecentOrderId } from '../orders/queries'
 import { useMenuCategoriesQuery, useMenuItemsQuery, useMenuStoreQuery } from './queries'
 
 interface MenuPageProps {
@@ -11,20 +14,79 @@ interface MenuPageProps {
 }
 
 export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPageProps) {
+  const navigate = useNavigate()
+  const authQuery = useAuthSessionQuery()
   const deferredCategorySlug = useDeferredValue(selectedCategorySlug)
   const storeQuery = useMenuStoreQuery()
   const categoriesQuery = useMenuCategoriesQuery()
   const itemsQuery = useMenuItemsQuery(deferredCategorySlug)
+  const placeOrderMutation = usePlaceOrderMutation()
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
 
   const store = storeQuery.data
   const categories = categoriesQuery.data?.categories ?? []
   const items = itemsQuery.data?.items ?? []
+  const currentUser = authQuery.data
+  const recentOrderId = readRecentOrderId()
   const activeCategorySlug = deferredCategorySlug?.trim() || undefined
   const activeCategory = activeCategorySlug
     ? categories.find((category) => category.slug === activeCategorySlug)
     : undefined
   const isLoading = storeQuery.isPending || categoriesQuery.isPending || itemsQuery.isPending
   const hasError = storeQuery.error || categoriesQuery.error || itemsQuery.error
+  const selectedItems = items
+    .map((item) => ({
+      ...item,
+      quantity: quantities[item.item_id] ?? 0,
+    }))
+    .filter((item) => item.quantity > 0)
+  const selectedCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0)
+  const selectedTotal = selectedItems.reduce(
+    (sum, item) => sum + item.quantity * item.price_amount,
+    0,
+  )
+
+  async function handlePlaceOrder() {
+    if (!store) {
+      return
+    }
+
+    if (!currentUser) {
+      await navigate({
+        search: {
+          redirect: '/menu',
+        },
+        to: '/login',
+      })
+      return
+    }
+
+    if (selectedItems.length === 0) {
+      return
+    }
+
+    const order = await placeOrderMutation.mutateAsync({
+      items: selectedItems.map((item) => ({
+        menu_item_id: item.item_id,
+        name: item.name,
+        quantity: item.quantity,
+        unit_price_amount: item.price_amount,
+      })),
+      store_id: store.store_id,
+    })
+
+    writeRecentOrderId(order.order_id)
+    startTransition(() => {
+      setQuantities({})
+    })
+
+    await navigate({
+      params: {
+        orderId: order.order_id,
+      },
+      to: '/orders/$orderId',
+    })
+  }
 
   return (
     <main className="page-wrap px-4 pt-14 pb-10">
@@ -98,6 +160,52 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
                 'Choose a category to narrow the list, or stay on all items to inspect the full menu.'}
             </p>
           </div>
+
+          <div className="island-shell rounded-[1.75rem] p-5">
+            <p className="island-kicker mb-2">Order</p>
+            <h2 className="mb-2 text-lg font-semibold text-[var(--sea-ink)]">
+              {selectedCount > 0 ? `${selectedCount} selected` : 'Build a quick order'}
+            </h2>
+            <p className="mb-4 text-sm text-[var(--sea-ink-soft)]">
+              {selectedCount > 0
+                ? `Total: ${formatMenuPrice(selectedTotal, store?.currency_code)}`
+                : currentUser
+                  ? 'Pick item quantities, then place a pickup order with one tap.'
+                  : 'Log in first, then turn your menu selections into a live order.'}
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                disabled={placeOrderMutation.isPending || selectedItems.length === 0}
+                onClick={() => {
+                  void handlePlaceOrder()
+                }}
+                className="rounded-full border border-[rgba(50,143,151,0.3)] bg-[rgba(79,184,178,0.14)] px-4 py-2 text-sm font-semibold text-[var(--lagoon-deep)] transition hover:-translate-y-0.5 hover:bg-[rgba(79,184,178,0.24)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {placeOrderMutation.isPending ? 'Placing order...' : 'Place order'}
+              </button>
+
+              {recentOrderId ? (
+                <Link
+                  params={{ orderId: recentOrderId }}
+                  to="/orders/$orderId"
+                  className="rounded-full border border-[rgba(47,106,74,0.22)] bg-[rgba(47,106,74,0.1)] px-4 py-2 text-center text-sm font-semibold text-[var(--sea-ink)] no-underline transition hover:-translate-y-0.5 hover:bg-[rgba(47,106,74,0.16)]"
+                >
+                  View recent order
+                </Link>
+              ) : null}
+            </div>
+
+            {placeOrderMutation.error ? (
+              <p
+                role="alert"
+                className="mt-4 rounded-2xl border border-[rgba(190,74,65,0.24)] bg-[rgba(190,74,65,0.1)] px-4 py-3 text-sm text-[var(--danger,#9f3a36)]"
+              >
+                {formatMenuError(placeOrderMutation.error)}
+              </p>
+            ) : null}
+          </div>
         </aside>
 
         <section className="space-y-4">
@@ -159,12 +267,31 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
                     </p>
 
                     <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
-                      <span className="text-xs tracking-[0.18em] text-[var(--sea-ink-soft)] uppercase">
-                        {item.slug}
-                      </span>
-                      <span className="text-xs font-semibold tracking-[0.16em] text-[var(--lagoon-deep)] uppercase">
-                        {item.status}
-                      </span>
+                      <div className="space-y-1">
+                        <span className="block text-xs tracking-[0.18em] text-[var(--sea-ink-soft)] uppercase">
+                          {item.slug}
+                        </span>
+                        <span className="block text-xs font-semibold tracking-[0.16em] text-[var(--lagoon-deep)] uppercase">
+                          {item.status}
+                        </span>
+                      </div>
+
+                      <QuantityControl
+                        quantity={quantities[item.item_id] ?? 0}
+                        onChange={(nextQuantity) => {
+                          startTransition(() => {
+                            setQuantities((current) => {
+                              const next = { ...current }
+                              if (nextQuantity <= 0) {
+                                delete next[item.item_id]
+                              } else {
+                                next[item.item_id] = nextQuantity
+                              }
+                              return next
+                            })
+                          })
+                        }}
+                      />
                     </div>
                   </article>
                 ))}
@@ -257,4 +384,38 @@ function resolveCategoryName(
   categories: Array<{ category_id: string; name: string }>,
 ) {
   return categories.find((category) => category.category_id === categoryId)?.name ?? 'Menu item'
+}
+
+function QuantityControl({
+  quantity,
+  onChange,
+}: {
+  quantity: number
+  onChange: (nextQuantity: number) => void
+}) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(50,143,151,0.18)] bg-white/70 px-2 py-1">
+      <button
+        type="button"
+        onClick={() => {
+          onChange(Math.max(0, quantity - 1))
+        }}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(50,143,151,0.16)] text-sm font-semibold text-[var(--lagoon-deep)] transition hover:bg-[rgba(79,184,178,0.12)]"
+      >
+        -
+      </button>
+      <span className="min-w-6 text-center text-sm font-semibold text-[var(--sea-ink)]">
+        {quantity}
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          onChange(quantity + 1)
+        }}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(50,143,151,0.16)] text-sm font-semibold text-[var(--lagoon-deep)] transition hover:bg-[rgba(79,184,178,0.12)]"
+      >
+        +
+      </button>
+    </div>
+  )
 }

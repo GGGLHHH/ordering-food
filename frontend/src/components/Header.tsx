@@ -1,6 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 
 import { useAuthSessionQuery, useLogoutMutation } from '#/features/auth/queries'
+import { readRecentOrderId } from '#/features/orders/queries'
 
 import ThemeToggle from './ThemeToggle'
 
@@ -11,6 +12,7 @@ export default function Header() {
   const logoutMutation = useLogoutMutation()
   const sessionQuery = useAuthSessionQuery()
   const currentUser = sessionQuery.data
+  const recentOrderId = currentUser ? readRecentOrderId() : null
   const authEntrySearch =
     location.pathname === '/login' || location.pathname === '/register'
       ? undefined
@@ -72,6 +74,27 @@ export default function Header() {
           <Link to="/menu" className="nav-link" activeProps={{ className: 'nav-link is-active' }}>
             Menu
           </Link>
+          {recentOrderId ? (
+            <>
+              <Link
+                to="/orders"
+                activeOptions={{ exact: true }}
+                className="nav-link"
+                activeProps={{ className: 'nav-link is-active' }}
+              >
+                My Orders
+              </Link>
+              <Link
+                params={{ orderId: recentOrderId }}
+                to="/orders/$orderId"
+                activeOptions={{ exact: true }}
+                className="nav-link"
+                activeProps={{ className: 'nav-link is-active' }}
+              >
+                Latest Order
+              </Link>
+            </>
+          ) : null}
           <Link to="/about" className="nav-link" activeProps={{ className: 'nav-link is-active' }}>
             About
           </Link>

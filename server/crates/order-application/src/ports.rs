@@ -1,4 +1,4 @@
-use crate::{ApplicationError, OrderReadModel};
+use crate::{ApplicationError, OrderListItemReadModel, OrderReadModel};
 use async_trait::async_trait;
 use ordering_food_order_domain::{Order, OrderId};
 use ordering_food_shared_kernel::Timestamp;
@@ -51,6 +51,11 @@ pub trait OrderReadRepository: Send + Sync {
         &self,
         order_id: &OrderId,
     ) -> Result<Option<OrderReadModel>, ApplicationError>;
+
+    async fn list_by_customer(
+        &self,
+        customer_id: &str,
+    ) -> Result<Vec<OrderListItemReadModel>, ApplicationError>;
 }
 
 #[derive(Clone)]
@@ -68,5 +73,12 @@ impl OrderQueryService {
         order_id: &OrderId,
     ) -> Result<Option<OrderReadModel>, ApplicationError> {
         self.repository.get_by_id(order_id).await
+    }
+
+    pub async fn list_by_customer(
+        &self,
+        customer_id: &str,
+    ) -> Result<Vec<OrderListItemReadModel>, ApplicationError> {
+        self.repository.list_by_customer(customer_id).await
     }
 }

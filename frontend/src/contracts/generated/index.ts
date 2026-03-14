@@ -28,6 +28,8 @@ export * from "./MenuItemsQuery";
 export * from "./MenuItemsResponse";
 export * from "./MenuStoreResponse";
 export * from "./OrderItemResponse";
+export * from "./OrderListItemResponse";
+export * from "./OrderListResponse";
 export * from "./OrderPath";
 export * from "./OrderResponse";
 export * from "./PageMeta";

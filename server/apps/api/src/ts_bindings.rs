@@ -17,7 +17,8 @@ use crate::{
         MenuItemsQuery, MenuItemsResponse, MenuStoreResponse,
     },
     routes::orders::{
-        OrderItemResponse, OrderPath, OrderResponse, PlaceOrderItemRequest, PlaceOrderRequest,
+        OrderItemResponse, OrderListItemResponse, OrderListResponse, OrderPath, OrderResponse,
+        PlaceOrderItemRequest, PlaceOrderRequest,
     },
 };
 use anyhow::{Context, anyhow, ensure};
@@ -98,6 +99,8 @@ fn export_contract_types(config: &Config) -> Result<(), ts_rs::ExportError> {
     PlaceOrderRequest::export_all(config)?;
     OrderPath::export_all(config)?;
     OrderItemResponse::export_all(config)?;
+    OrderListItemResponse::export_all(config)?;
+    OrderListResponse::export_all(config)?;
     OrderResponse::export_all(config)?;
     Ok(())
 }
@@ -219,6 +222,8 @@ mod tests {
         let menu_items_query = fs::read_to_string(temp_root.join("MenuItemsQuery.ts")).unwrap();
         let place_order_request =
             fs::read_to_string(temp_root.join("PlaceOrderRequest.ts")).unwrap();
+        let order_list_response =
+            fs::read_to_string(temp_root.join("OrderListResponse.ts")).unwrap();
         let order_response = fs::read_to_string(temp_root.join("OrderResponse.ts")).unwrap();
         let update_identity_user_profile_request =
             fs::read_to_string(temp_root.join("UpdateIdentityUserProfileRequest.ts")).unwrap();
@@ -233,6 +238,7 @@ mod tests {
         assert!(menu_store_response.contains("currency_code: string"));
         assert!(menu_items_query.contains("category_slug?: string"));
         assert!(place_order_request.contains("items: Array<PlaceOrderItemRequest>"));
+        assert!(order_list_response.contains("orders: Array<OrderListItemResponse>"));
         assert!(order_response.contains("status: string"));
         assert!(update_identity_user_profile_request.contains("display_name: string"));
         assert!(index.contains("export * from \"./ErrorEnvelope\";"));
@@ -242,6 +248,7 @@ mod tests {
         assert!(index.contains("export * from \"./MenuStoreResponse\";"));
         assert!(index.contains("export * from \"./MenuItemsQuery\";"));
         assert!(index.contains("export * from \"./PlaceOrderRequest\";"));
+        assert!(index.contains("export * from \"./OrderListResponse\";"));
         assert!(index.contains("export * from \"./OrderResponse\";"));
         assert!(index.contains("export * from \"./UpdateIdentityUserProfileRequest\";"));
         assert!(index.contains("export * from \"./ReadyResponse\";"));

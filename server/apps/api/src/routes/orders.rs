@@ -44,7 +44,7 @@ const REJECT_ROUTE_PATH: &str = "/{order_id}/reject";
 
 pub fn router(module: Arc<OrderModule>) -> Router<AppState> {
     Router::new()
-        .route(ROOT_ROUTE_PATH, post(place_order))
+        .route(ROOT_ROUTE_PATH, get(list_orders).post(place_order))
         .route(DETAIL_ROUTE_PATH, get(get_order))
         .route(CANCEL_ROUTE_PATH, post(cancel_order))
         .route(ACCEPT_ROUTE_PATH, post(accept_order))
@@ -61,6 +61,7 @@ pub fn router(module: Arc<OrderModule>) -> Router<AppState> {
 #[openapi(
     paths(
         place_order,
+        list_orders,
         get_order,
         cancel_order,
         accept_order,
@@ -76,6 +77,8 @@ pub fn router(module: Arc<OrderModule>) -> Router<AppState> {
             PlaceOrderRequest,
             OrderPath,
             OrderItemResponse,
+            OrderListItemResponse,
+            OrderListResponse,
             OrderResponse,
         )
     ),
@@ -128,6 +131,23 @@ pub struct OrderResponse {
     pub items: Vec<OrderItemResponse>,
 }
 
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+pub struct OrderListItemResponse {
+    pub order_id: String,
+    pub store_id: String,
+    pub status: String,
+    pub subtotal_amount: i64,
+    pub total_amount: i64,
+    pub item_count: usize,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+pub struct OrderListResponse {
+    pub orders: Vec<OrderListItemResponse>,
+}
+
 #[utoipa::path(
     post,
     path = ORDERS_PATH,
@@ -171,6 +191,44 @@ pub async fn place_order(
     let response =
         load_order_response(&module, order.id().as_str(), None, context.request_id).await?;
     Ok(Json(response))
+}
+
+#[utoipa::path(
+    get,
+    path = ORDERS_PATH,
+    tag = "orders",
+    responses(
+        (status = 200, description = "List current user's orders", body = OrderListResponse),
+        (status = 401, description = "Not authenticated", body = ErrorEnvelope),
+        (status = 500, description = "Internal server error", body = ErrorEnvelope)
+    )
+)]
+pub async fn list_orders(
+    Extension(module): Extension<Arc<OrderModule>>,
+    context: RequestContext,
+    user: AuthenticatedUser,
+) -> Result<Json<OrderListResponse>, AppError> {
+    let orders = module
+        .order_queries
+        .list_by_customer(&user.user_id)
+        .await
+        .map_err(|error| map_order_error(error, context.request_id))?
+        .into_iter()
+        .map(|order| {
+            Ok(OrderListItemResponse {
+                order_id: order.order_id,
+                store_id: order.store_id,
+                status: order.status,
+                subtotal_amount: order.subtotal_amount,
+                total_amount: order.total_amount,
+                item_count: order.item_count,
+                created_at: format_timestamp(order.created_at)?,
+                updated_at: format_timestamp(order.updated_at)?,
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+
+    Ok(Json(OrderListResponse { orders }))
 }
 
 #[utoipa::path(
@@ -578,8 +636,9 @@ mod tests {
     use ordering_food_authz_domain::{GlobalRole, StoreRole};
     use ordering_food_identity_application::{AccessTokenClaims, TokenPair, TokenService};
     use ordering_food_order_application::{
-        Clock, IdGenerator, OrderItemReadModel, OrderModule, OrderReadModel, OrderReadRepository,
-        OrderRepository, TransactionContext, TransactionManager,
+        Clock, IdGenerator, OrderItemReadModel, OrderListItemReadModel, OrderModule,
+        OrderReadModel, OrderReadRepository, OrderRepository, TransactionContext,
+        TransactionManager,
     };
     use ordering_food_order_domain::{
         CustomerId, MenuItemId, Order, OrderId, OrderStatus, PlaceOrderItemInput, StoreId,
@@ -733,6 +792,40 @@ mod tests {
                         })
                         .collect(),
                 }))
+        }
+
+        async fn list_by_customer(
+            &self,
+            customer_id: &str,
+        ) -> Result<Vec<OrderListItemReadModel>, ApplicationError> {
+            let mut orders = self
+                .state
+                .lock()
+                .unwrap()
+                .orders
+                .values()
+                .filter(|order| order.customer_id().as_str() == customer_id)
+                .map(|order| OrderListItemReadModel {
+                    order_id: order.id().as_str().to_string(),
+                    customer_id: order.customer_id().as_str().to_string(),
+                    store_id: order.store_id().as_str().to_string(),
+                    status: order.status().as_str().to_string(),
+                    subtotal_amount: order.subtotal_amount(),
+                    total_amount: order.total_amount(),
+                    created_at: order.created_at(),
+                    updated_at: order.updated_at(),
+                    item_count: order.items().len(),
+                })
+                .collect::<Vec<_>>();
+
+            orders.sort_by(|left, right| {
+                right
+                    .created_at
+                    .cmp(&left.created_at)
+                    .then_with(|| right.order_id.cmp(&left.order_id))
+            });
+
+            Ok(orders)
         }
     }
 

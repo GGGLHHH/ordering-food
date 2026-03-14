@@ -22,3 +22,16 @@ pub struct OrderReadModel {
     pub updated_at: Timestamp,
     pub items: Vec<OrderItemReadModel>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderListItemReadModel {
+    pub order_id: String,
+    pub customer_id: String,
+    pub store_id: String,
+    pub status: String,
+    pub subtotal_amount: i64,
+    pub total_amount: i64,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub item_count: usize,
+}

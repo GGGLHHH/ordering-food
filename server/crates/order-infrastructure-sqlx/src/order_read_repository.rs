@@ -1,7 +1,8 @@
 use crate::db_order_status::DbOrderStatus;
 use async_trait::async_trait;
 use ordering_food_order_application::{
-    ApplicationError, OrderItemReadModel, OrderReadModel, OrderReadRepository,
+    ApplicationError, OrderItemReadModel, OrderListItemReadModel, OrderReadModel,
+    OrderReadRepository,
 };
 use ordering_food_order_domain::OrderId;
 use ordering_food_shared_kernel::Identifier;
@@ -100,6 +101,63 @@ impl OrderReadRepository for SqlxOrderReadRepository {
                 })
                 .collect(),
         }))
+    }
+
+    async fn list_by_customer(
+        &self,
+        customer_id: &str,
+    ) -> Result<Vec<OrderListItemReadModel>, ApplicationError> {
+        let customer_id = Uuid::parse_str(customer_id)
+            .map_err(|_| ApplicationError::validation("customer id must be a valid UUID"))?;
+
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                o.id,
+                o.customer_id,
+                o.store_id,
+                o.status,
+                o.subtotal_amount,
+                o.total_amount,
+                o.created_at,
+                o.updated_at,
+                COUNT(oi.line_number) AS item_count
+            FROM ordering.orders o
+            LEFT JOIN ordering.order_items oi ON oi.order_id = o.id
+            WHERE o.customer_id = $1
+            GROUP BY
+                o.id,
+                o.customer_id,
+                o.store_id,
+                o.status,
+                o.subtotal_amount,
+                o.total_amount,
+                o.created_at,
+                o.updated_at
+            ORDER BY o.created_at DESC, o.id DESC
+            "#,
+        )
+        .bind(customer_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| {
+            ApplicationError::unexpected_with_source("failed to query customer orders", error)
+        })?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| OrderListItemReadModel {
+                order_id: row.get::<Uuid, _>("id").to_string(),
+                customer_id: row.get::<Uuid, _>("customer_id").to_string(),
+                store_id: row.get::<Uuid, _>("store_id").to_string(),
+                status: DbOrderStatus::to_status_string(row.get::<DbOrderStatus, _>("status")),
+                subtotal_amount: row.get("subtotal_amount"),
+                total_amount: row.get("total_amount"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+                item_count: row.get::<i64, _>("item_count") as usize,
+            })
+            .collect())
     }
 }
 
