@@ -5,8 +5,8 @@
       "url": "http://localhost:1000/mcp"
     },
     "gitnexus": {
-      "command": "vp",
-      "args": ["dlx", "gitnexus@latest", "mcp"]
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
     }
   }
 }
