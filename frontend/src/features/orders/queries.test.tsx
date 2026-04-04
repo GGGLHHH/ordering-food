@@ -113,7 +113,7 @@ function PlaceOrderProbe() {
       >
         place-order
       </button>
-      <p>{mutation.data ? `placed:${mutation.data.order_id}` : readRecentOrderId() ?? 'none'}</p>
+      <p>{mutation.data ? `placed:${mutation.data.order_id}` : (readRecentOrderId() ?? 'none')}</p>
     </>
   )
 }

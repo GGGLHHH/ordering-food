@@ -18,6 +18,7 @@ const config = defineConfig({
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
       'jsx-a11y/autocomplete-valid': 'off',
+      'no-unused-vars': ['error', { fix: { imports: 'fix' } }],
     },
     overrides: [
       {
