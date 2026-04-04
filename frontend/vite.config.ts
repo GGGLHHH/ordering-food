@@ -11,7 +11,7 @@ const config = defineConfig({
   lint: {
     plugins: ['react', 'typescript', 'jsx-a11y'],
     options: { typeAware: true, typeCheck: true },
-    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**'],
+    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**', '*.md'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/consistent-type-imports': 'off',
@@ -52,7 +52,7 @@ const config = defineConfig({
     semi: false,
     trailingComma: 'all',
     arrowParens: 'always',
-    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**'],
+    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**', '*.md'],
     sortImports: {
       internalPattern: ['#/*', '@/*'],
     },
