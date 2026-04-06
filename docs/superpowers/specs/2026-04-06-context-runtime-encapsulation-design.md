@@ -65,7 +65,14 @@ impl FooContextRuntime {
 
 The constructor functions (`build_*_context_runtime`) already create the struct internally, so they continue to work with private fields.
 
-External call sites change from `runtime.field` to `runtime.field()` (for by-ref) or `runtime.field().clone()` (for owned clone).
+**Call site migration notes:**
+
+- Most call sites already use `.clone()` (e.g., `runtime.module.clone()` → `runtime.module().clone()`). These just need parentheses added.
+- Two call sites use **move semantics** (ownership transfer) instead of clone:
+  - `ordering.rs:35`: `let module = runtime.module;` → must become `runtime.module().clone()`
+  - `fulfillment.rs:60-61`: `let module = runtime.module;` and `let projector = runtime.ordering_event_projector;` → must become `.clone()`
+- Crate-internal functions (`seed_default_organization`, `seed_default_catalog`) access private fields directly — Rust allows this within the same crate, so they require no changes.
+- `OrganizationContextRuntime.module` has an accessor for consistency even though no external caller currently uses it.
 
 **Field-by-field accessor table:**
 
@@ -90,11 +97,11 @@ Delete the `ordering-food-ordering-published` line from `crates/fulfillment-infr
 
 ### NV-3: Privatize IdentityContextConfig fields
 
-Remove `pub` from all 3 fields. The `new()` constructor and `#[derive(Clone)]` provide sufficient access. No accessor methods needed since config is only consumed at construction time.
+Remove `pub` from all 3 fields. The `new()` constructor provides sufficient access. All derive macros (`Debug`, `Clone`, `PartialEq`, `Eq`) work correctly with private fields. No accessor methods needed since config is only consumed at construction time.
 
 ### Architecture tests
 
-Check existing architecture tests for patterns that match `pub` field access and update if needed.
+Existing architecture tests do not check field-level `pub` modifiers on ContextRuntime structs — they check struct names, function names, and import patterns. No architecture test updates are needed for NV-1/NV-2/NV-3.
 
 ## Execution Order
 
