@@ -1,4 +1,5 @@
 use crate::composition::{
+    capabilities::{IDENTITY_ACCESS_TOKEN_VERIFIER, IDENTITY_SUBJECT_LOOKUP_GATEWAY},
     context_registration::ApiContextRegistration,
     contribution::{ApiContextContribution, ApiNamedReadinessCheck},
     platform::ApiPlatform,
@@ -6,11 +7,8 @@ use crate::composition::{
 use crate::routes::auth::{self, AuthApiDoc};
 use crate::routes::identity::{self, IdentityApiDoc};
 use ordering_food_bootstrap_core::{BootstrapRegistration, ContextDescriptor};
-use ordering_food_identity_application::TokenService;
-use ordering_food_identity_infrastructure_auth::{
-    Argon2PasswordHasher, JwtTokenService, RedisRefreshTokenStore,
-};
-use ordering_food_identity_infrastructure_sqlx::build_identity_module;
+use ordering_food_identity_integration::{IdentityContextConfig, build_identity_context_runtime};
+use ordering_food_identity_published::{AccessTokenVerifier, SubjectLookupGateway};
 use std::sync::Arc;
 use utoipa::OpenApi;
 
@@ -30,26 +28,28 @@ fn identity_bootstrap_registration(
         let context_id = descriptor.id;
         let pg_pool = platform.pg_pool.clone();
         let clock = platform.clock.clone();
-        let id_generator = platform.id_generator.clone();
         let auth_settings = platform.settings.auth.clone();
         let redis_client = platform.redis_client.clone();
+        let capabilities = platform.capabilities.clone();
         async move {
-            let password_hasher = Arc::new(Argon2PasswordHasher);
-            let token_service: Arc<dyn TokenService> = Arc::new(JwtTokenService::new(
-                auth_settings.jwt_secret.clone(),
-                auth_settings.access_token_ttl_seconds,
-                auth_settings.refresh_token_ttl_seconds,
-            ));
-            let refresh_token_store = Arc::new(RedisRefreshTokenStore::new(redis_client));
-
-            let module = build_identity_module(
-                pg_pool,
+            let runtime = build_identity_context_runtime(
+                pg_pool.clone(),
                 clock,
-                id_generator,
-                password_hasher,
-                token_service.clone(),
-                refresh_token_store,
+                redis_client,
+                IdentityContextConfig::new(
+                    auth_settings.jwt_secret.clone(),
+                    auth_settings.access_token_ttl_seconds,
+                    auth_settings.refresh_token_ttl_seconds,
+                ),
             );
+            let module = runtime.module().clone();
+            let token_verifier: Arc<dyn AccessTokenVerifier> =
+                runtime.access_token_verifier().clone();
+            let subject_lookup_gateway: Arc<dyn SubjectLookupGateway> =
+                runtime.subject_lookup_gateway().clone();
+
+            capabilities.publish(IDENTITY_ACCESS_TOKEN_VERIFIER, token_verifier.clone());
+            capabilities.publish(IDENTITY_SUBJECT_LOOKUP_GATEWAY, subject_lookup_gateway);
 
             let mut contribution = ApiContextContribution::empty(context_id);
             contribution.add_readiness_check(ApiNamedReadinessCheck::always_ok(
@@ -62,11 +62,11 @@ fn identity_bootstrap_registration(
             );
             contribution.add_route_mount(
                 auth::AUTH_ROUTE_PREFIX,
-                auth::router(module.clone(), auth_settings).layer(axum::Extension(token_service)),
+                auth::router(module.clone(), auth_settings).layer(axum::Extension(token_verifier)),
             );
             contribution.add_openapi_document(IdentityApiDoc::openapi());
             contribution.add_openapi_document(AuthApiDoc::openapi());
-            contribution.retain_private(module);
+            contribution.retain_private(runtime);
 
             Ok::<_, std::io::Error>(contribution)
         }

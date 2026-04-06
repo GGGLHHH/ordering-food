@@ -40,9 +40,23 @@ impl IdentityContextConfig {
 
 #[derive(Clone)]
 pub struct IdentityContextRuntime {
-    pub module: Arc<IdentityModule>,
-    pub access_token_verifier: Arc<dyn AccessTokenVerifier>,
-    pub subject_lookup_gateway: Arc<dyn SubjectLookupGateway>,
+    module: Arc<IdentityModule>,
+    access_token_verifier: Arc<dyn AccessTokenVerifier>,
+    subject_lookup_gateway: Arc<dyn SubjectLookupGateway>,
+}
+
+impl IdentityContextRuntime {
+    pub fn module(&self) -> &Arc<IdentityModule> {
+        &self.module
+    }
+
+    pub fn access_token_verifier(&self) -> &Arc<dyn AccessTokenVerifier> {
+        &self.access_token_verifier
+    }
+
+    pub fn subject_lookup_gateway(&self) -> &Arc<dyn SubjectLookupGateway> {
+        &self.subject_lookup_gateway
+    }
 }
 
 pub fn build_identity_context_runtime(
