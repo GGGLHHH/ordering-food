@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use ordering_food_organization_application::{ApplicationError, BrandReadRepository, BrandRef};
-use ordering_food_organization_domain::BrandId;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -14,15 +13,15 @@ impl SqlxBrandReadRepository {
         Self { pool }
     }
 
-    fn parse_brand_id(brand_id: &BrandId) -> Result<Uuid, ApplicationError> {
-        Uuid::parse_str(brand_id.as_str())
+    fn parse_brand_id(brand_id: &str) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(brand_id)
             .map_err(|_| ApplicationError::validation("brand id must be a valid UUID"))
     }
 }
 
 #[async_trait]
 impl BrandReadRepository for SqlxBrandReadRepository {
-    async fn get_by_id(&self, brand_id: &BrandId) -> Result<Option<BrandRef>, ApplicationError> {
+    async fn get_by_id(&self, brand_id: &str) -> Result<Option<BrandRef>, ApplicationError> {
         let brand_id = Self::parse_brand_id(brand_id)?;
         let row = sqlx::query(
             r#"

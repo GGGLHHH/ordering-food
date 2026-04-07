@@ -29,7 +29,7 @@ impl CreateBrand {
         }
     }
 
-    pub async fn execute(&self, input: CreateBrandInput) -> Result<Brand, ApplicationError> {
+    pub async fn execute(&self, input: CreateBrandInput) -> Result<String, ApplicationError> {
         let now = self.clock.now();
         let brand_id = input
             .brand_id
@@ -50,6 +50,6 @@ impl CreateBrand {
         }
 
         unit_of_work.commit().await?;
-        Ok(brand)
+        Ok(brand.id().as_str().to_string())
     }
 }

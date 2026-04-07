@@ -31,7 +31,7 @@ impl CreateStore {
         }
     }
 
-    pub async fn execute(&self, input: CreateStoreInput) -> Result<Store, ApplicationError> {
+    pub async fn execute(&self, input: CreateStoreInput) -> Result<String, ApplicationError> {
         let now = self.clock.now();
         let brand_id = BrandId::new(input.brand_id);
         let status = OrganizationStatus::parse(input.status)?;
@@ -73,6 +73,6 @@ impl CreateStore {
         }
 
         unit_of_work.commit().await?;
-        Ok(store)
+        Ok(store.id().as_str().to_string())
     }
 }

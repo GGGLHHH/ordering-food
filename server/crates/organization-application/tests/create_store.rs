@@ -42,7 +42,7 @@ async fn create_brand_persists_brand() {
         Arc::new(FixedIdGenerator),
     );
 
-    let brand = use_case
+    let brand_id = use_case
         .execute(CreateBrandInput {
             brand_id: None,
             slug: "ordering-food".to_string(),
@@ -52,8 +52,7 @@ async fn create_brand_persists_brand() {
         .await
         .unwrap();
 
-    assert_eq!(brand.id().as_str(), "brand-1");
-    assert_eq!(brand.slug(), "ordering-food");
+    assert_eq!(brand_id, "brand-1");
     assert_eq!(
         unit_of_work_factory
             .state
@@ -87,7 +86,7 @@ async fn create_store_persists_store_when_brand_exists() {
         Arc::new(FixedIdGenerator),
     );
 
-    let store = use_case
+    let store_id = use_case
         .execute(CreateStoreInput {
             brand_id: "brand-1".to_string(),
             slug: "demo-kitchen".to_string(),
@@ -99,8 +98,7 @@ async fn create_store_persists_store_when_brand_exists() {
         .await
         .unwrap();
 
-    assert_eq!(store.id().as_str(), "store-1");
-    assert_eq!(store.brand_id().as_str(), "brand-1");
+    assert_eq!(store_id, "store-1");
     assert_eq!(
         unit_of_work_factory
             .state
@@ -347,13 +345,13 @@ impl StoreReadRepository for FakeStoreReadRepository {
 
     async fn get_by_id(
         &self,
-        store_id: &StoreId,
+        store_id: &str,
     ) -> Result<Option<StoreSummary>, ApplicationError> {
         Ok(self
             .active_store
             .lock()
             .unwrap()
             .clone()
-            .filter(|store| store.store_id == store_id.as_str()))
+            .filter(|store| store.store_id == store_id))
     }
 }

@@ -39,13 +39,13 @@ pub trait OrganizationUnitOfWorkFactory: Send + Sync {
 
 #[async_trait]
 pub trait BrandReadRepository: Send + Sync {
-    async fn get_by_id(&self, brand_id: &BrandId) -> Result<Option<BrandRef>, ApplicationError>;
+    async fn get_by_id(&self, brand_id: &str) -> Result<Option<BrandRef>, ApplicationError>;
 }
 
 #[async_trait]
 pub trait StoreReadRepository: Send + Sync {
     async fn get_active(&self) -> Result<Option<StoreSummary>, ApplicationError>;
-    async fn get_by_id(&self, store_id: &StoreId)
+    async fn get_by_id(&self, store_id: &str)
     -> Result<Option<StoreSummary>, ApplicationError>;
 }
 
@@ -63,7 +63,7 @@ impl BrandQueryService {
         &self,
         brand_id: &str,
     ) -> Result<Option<BrandRef>, ApplicationError> {
-        self.repository.get_by_id(&BrandId::new(brand_id)).await
+        self.repository.get_by_id(brand_id).await
     }
 }
 
@@ -85,6 +85,6 @@ impl StoreQueryService {
         &self,
         store_id: &str,
     ) -> Result<Option<StoreSummary>, ApplicationError> {
-        self.repository.get_by_id(&StoreId::new(store_id)).await
+        self.repository.get_by_id(store_id).await
     }
 }

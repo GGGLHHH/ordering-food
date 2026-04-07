@@ -557,14 +557,14 @@ mod tests {
 
         async fn get_by_id(
             &self,
-            store_id: &StoreId,
+            store_id: &str,
         ) -> Result<Option<StoreSummary>, ApplicationError> {
             Ok(self
                 .state
                 .lock()
                 .unwrap()
                 .stores
-                .get(store_id.as_str())
+                .get(store_id)
                 .map(|store| StoreSummary {
                     store_id: store.id().as_str().to_string(),
                     brand_id: store.brand_id().as_str().to_string(),

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use ordering_food_organization_application::{ApplicationError, StoreReadRepository, StoreSummary};
-use ordering_food_organization_domain::StoreId;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -14,8 +13,8 @@ impl SqlxStoreReadRepository {
         Self { pool }
     }
 
-    fn parse_store_id(store_id: &StoreId) -> Result<Uuid, ApplicationError> {
-        Uuid::parse_str(store_id.as_str())
+    fn parse_store_id(store_id: &str) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(store_id)
             .map_err(|_| ApplicationError::validation("store id must be a valid UUID"))
     }
 }
@@ -61,7 +60,7 @@ impl StoreReadRepository for SqlxStoreReadRepository {
 
     async fn get_by_id(
         &self,
-        store_id: &StoreId,
+        store_id: &str,
     ) -> Result<Option<StoreSummary>, ApplicationError> {
         let store_id = Self::parse_store_id(store_id)?;
         let row = sqlx::query(
