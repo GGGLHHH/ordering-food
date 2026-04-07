@@ -532,6 +532,10 @@ export interface components {
       message: string
       request_id?: string | null
     }
+    ExampleItemPath: {
+      /** Format: int64 */
+      item_id: number
+    }
     ExampleItemResponse: {
       /** Format: int64 */
       item_id: number
@@ -544,6 +548,10 @@ export interface components {
     ExamplePayloadResponse: {
       accepted: boolean
       payload: components['schemas']['ExamplePayload']
+    }
+    ExampleSearchQuery: {
+      /** Format: int32 */
+      page: number
     }
     ExampleSearchResponse: {
       /** Format: int32 */

@@ -2019,6 +2019,17 @@
           }
         }
       },
+      "ExampleItemPath": {
+        "type": "object",
+        "required": ["item_id"],
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "ExampleItemResponse": {
         "type": "object",
         "required": ["item_id"],
@@ -2053,6 +2064,17 @@
           },
           "payload": {
             "$ref": "#/components/schemas/ExamplePayload"
+          }
+        }
+      },
+      "ExampleSearchQuery": {
+        "type": "object",
+        "required": ["page"],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
