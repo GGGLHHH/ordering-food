@@ -8,4 +8,8 @@ pub enum DomainError {
     EmptyName,
     #[error("price amount cannot be negative")]
     NegativePriceAmount,
+    #[error("invalid sellable status: `{0}`")]
+    InvalidSellableStatus(String),
+    #[error("invalid display rule: `{0}`")]
+    InvalidDisplayRule(String),
 }

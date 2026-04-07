@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use ordering_food_catalog_application::{
     ApplicationError, BrandCatalogReadModel, BrandCatalogReadRepository,
 };
-use ordering_food_catalog_domain::{BrandCatalogId, BrandId};
 use sqlx::{PgPool, Row};
 
 #[derive(Clone)]
@@ -84,15 +83,15 @@ fn map_brand_catalog_row(row: sqlx::postgres::PgRow) -> BrandCatalogReadModel {
 impl BrandCatalogReadRepository for SqlxBrandCatalogReadRepository {
     async fn find_by_id(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError> {
-        SqlxBrandCatalogReadRepository::find_by_id(self, brand_catalog_id.as_str()).await
+        SqlxBrandCatalogReadRepository::find_by_id(self, brand_catalog_id).await
     }
 
     async fn find_by_brand_id(
         &self,
-        brand_id: &BrandId,
+        brand_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError> {
-        SqlxBrandCatalogReadRepository::find_by_brand_id(self, brand_id.as_str()).await
+        SqlxBrandCatalogReadRepository::find_by_brand_id(self, brand_id).await
     }
 }

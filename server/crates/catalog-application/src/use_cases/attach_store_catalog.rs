@@ -39,7 +39,7 @@ impl AttachStoreCatalog {
     pub async fn execute(
         &self,
         input: AttachStoreCatalogInput,
-    ) -> Result<StoreCatalog, ApplicationError> {
+    ) -> Result<String, ApplicationError> {
         let store_scope = self
             .organization_scope_reader
             .get_store_scope(&input.brand_id, &input.store_id)
@@ -85,7 +85,7 @@ impl AttachStoreCatalog {
         }
 
         self.transaction_manager.commit(tx).await?;
-        Ok(store_catalog)
+        Ok(store_catalog.id().as_str().to_string())
     }
 }
 
@@ -98,7 +98,7 @@ mod tests {
     };
     use async_trait::async_trait;
     use ordering_food_catalog_domain::{
-        BrandId, CategoryId, ItemId, StoreCatalog, StoreCatalogId, StoreId,
+        CategoryId, ItemId, StoreCatalog, StoreCatalogId, StoreId,
     };
     use ordering_food_organization_published::{BrandRef, StoreSummary};
     use ordering_food_shared_kernel::Timestamp;
@@ -298,7 +298,7 @@ mod tests {
             Arc::new(FakeIdGenerator),
         );
 
-        let store_catalog = use_case
+        let store_catalog_id = use_case
             .execute(AttachStoreCatalogInput {
                 brand_id: "brand-1".to_string(),
                 store_id: "store-1".to_string(),
@@ -306,7 +306,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(store_catalog.brand_id(), &BrandId::new("brand-1"));
+        assert!(!store_catalog_id.is_empty());
         assert_eq!(repository.inserted.lock().unwrap().len(), 1);
     }
 }

@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use ordering_food_catalog_application::{
     ApplicationError, CategoryReadModel, CategoryReadRepository,
 };
-use ordering_food_catalog_domain::BrandCatalogId;
 use sqlx::{PgPool, Row};
 
 #[derive(Clone)]
@@ -86,16 +85,16 @@ fn map_category_row(row: sqlx::postgres::PgRow) -> CategoryReadModel {
 impl CategoryReadRepository for SqlxCategoryReadRepository {
     async fn list_by_brand_catalog_id(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
     ) -> Result<Vec<CategoryReadModel>, ApplicationError> {
-        SqlxCategoryReadRepository::list_by_brand_catalog_id(self, brand_catalog_id.as_str()).await
+        SqlxCategoryReadRepository::list_by_brand_catalog_id(self, brand_catalog_id).await
     }
 
     async fn find_by_slug(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
         slug: &str,
     ) -> Result<Option<CategoryReadModel>, ApplicationError> {
-        SqlxCategoryReadRepository::find_by_slug(self, brand_catalog_id.as_str(), slug).await
+        SqlxCategoryReadRepository::find_by_slug(self, brand_catalog_id, slug).await
     }
 }

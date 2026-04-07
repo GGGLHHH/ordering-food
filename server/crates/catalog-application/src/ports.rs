@@ -126,12 +126,12 @@ pub trait StoreItemListingRepository: Send + Sync {
 pub trait BrandCatalogReadRepository: Send + Sync {
     async fn find_by_id(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError>;
 
     async fn find_by_brand_id(
         &self,
-        brand_id: &BrandId,
+        brand_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError>;
 }
 
@@ -139,12 +139,12 @@ pub trait BrandCatalogReadRepository: Send + Sync {
 pub trait StoreCatalogReadRepository: Send + Sync {
     async fn find_by_id(
         &self,
-        store_catalog_id: &StoreCatalogId,
+        store_catalog_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError>;
 
     async fn find_by_store_id(
         &self,
-        store_id: &StoreId,
+        store_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError>;
 }
 
@@ -152,12 +152,12 @@ pub trait StoreCatalogReadRepository: Send + Sync {
 pub trait CategoryReadRepository: Send + Sync {
     async fn list_by_brand_catalog_id(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
     ) -> Result<Vec<CategoryReadModel>, ApplicationError>;
 
     async fn find_by_slug(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
         slug: &str,
     ) -> Result<Option<CategoryReadModel>, ApplicationError>;
 }
@@ -171,16 +171,16 @@ pub struct CatalogItemListFilter {
 pub trait ItemReadRepository: Send + Sync {
     async fn list_by_brand_catalog_id(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
         filter: CatalogItemListFilter,
     ) -> Result<Vec<ItemReadModel>, ApplicationError>;
 
-    async fn find_by_id(&self, item_id: &ItemId)
+    async fn find_by_id(&self, item_id: &str)
     -> Result<Option<ItemReadModel>, ApplicationError>;
 
     async fn find_by_slug(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
         slug: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError>;
 }
@@ -189,13 +189,13 @@ pub trait ItemReadRepository: Send + Sync {
 pub trait StoreItemListingReadRepository: Send + Sync {
     async fn find_by_item_id(
         &self,
-        store_catalog_id: &StoreCatalogId,
-        item_id: &ItemId,
+        store_catalog_id: &str,
+        item_id: &str,
     ) -> Result<Option<StoreItemListingReadModel>, ApplicationError>;
 
     async fn list_by_store_catalog_id(
         &self,
-        store_catalog_id: &StoreCatalogId,
+        store_catalog_id: &str,
     ) -> Result<Vec<StoreItemListingReadModel>, ApplicationError>;
 }
 
@@ -214,7 +214,7 @@ impl BrandCatalogQueryService {
         brand_catalog_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError> {
         self.repository
-            .find_by_id(&BrandCatalogId::new(brand_catalog_id))
+            .find_by_id(brand_catalog_id)
             .await
     }
 
@@ -223,7 +223,7 @@ impl BrandCatalogQueryService {
         brand_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError> {
         self.repository
-            .find_by_brand_id(&BrandId::new(brand_id))
+            .find_by_brand_id(brand_id)
             .await
     }
 }
@@ -243,7 +243,7 @@ impl StoreCatalogQueryService {
         store_catalog_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError> {
         self.repository
-            .find_by_id(&StoreCatalogId::new(store_catalog_id))
+            .find_by_id(store_catalog_id)
             .await
     }
 
@@ -252,7 +252,7 @@ impl StoreCatalogQueryService {
         store_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError> {
         self.repository
-            .find_by_store_id(&StoreId::new(store_id))
+            .find_by_store_id(store_id)
             .await
     }
 }
@@ -324,7 +324,7 @@ impl CategoryQueryService {
         brand_catalog_id: &str,
     ) -> Result<Vec<CategoryReadModel>, ApplicationError> {
         self.repository
-            .list_by_brand_catalog_id(&BrandCatalogId::new(brand_catalog_id))
+            .list_by_brand_catalog_id(brand_catalog_id)
             .await
     }
 
@@ -334,7 +334,7 @@ impl CategoryQueryService {
         slug: &str,
     ) -> Result<Option<CategoryReadModel>, ApplicationError> {
         self.repository
-            .find_by_slug(&BrandCatalogId::new(brand_catalog_id), slug)
+            .find_by_slug(brand_catalog_id, slug)
             .await
     }
 }
@@ -355,7 +355,7 @@ impl ItemQueryService {
         filter: CatalogItemListFilter,
     ) -> Result<Vec<ItemReadModel>, ApplicationError> {
         self.repository
-            .list_by_brand_catalog_id(&BrandCatalogId::new(brand_catalog_id), filter)
+            .list_by_brand_catalog_id(brand_catalog_id, filter)
             .await
     }
 
@@ -363,7 +363,7 @@ impl ItemQueryService {
         &self,
         item_id: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError> {
-        self.repository.find_by_id(&ItemId::new(item_id)).await
+        self.repository.find_by_id(item_id).await
     }
 
     pub async fn find_by_slug(
@@ -372,7 +372,7 @@ impl ItemQueryService {
         slug: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError> {
         self.repository
-            .find_by_slug(&BrandCatalogId::new(brand_catalog_id), slug)
+            .find_by_slug(brand_catalog_id, slug)
             .await
     }
 }
@@ -394,8 +394,8 @@ impl StoreItemListingQueryService {
     ) -> Result<Option<StoreItemListingReadModel>, ApplicationError> {
         self.repository
             .find_by_item_id(
-                &StoreCatalogId::new(store_catalog_id),
-                &ItemId::new(item_id),
+                store_catalog_id,
+                item_id,
             )
             .await
     }
@@ -405,7 +405,7 @@ impl StoreItemListingQueryService {
         store_catalog_id: &str,
     ) -> Result<Vec<StoreItemListingReadModel>, ApplicationError> {
         self.repository
-            .list_by_store_catalog_id(&StoreCatalogId::new(store_catalog_id))
+            .list_by_store_catalog_id(store_catalog_id)
             .await
     }
 }

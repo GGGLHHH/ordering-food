@@ -12,8 +12,8 @@ pub struct UpsertStoreItemListingInput {
     pub store_catalog_id: String,
     pub item_id: String,
     pub price_amount: i64,
-    pub status: SellableStatus,
-    pub display_rule: DisplayRule,
+    pub status: String,
+    pub display_rule: String,
 }
 
 pub struct UpsertStoreItemListing {
@@ -44,10 +44,12 @@ impl UpsertStoreItemListing {
     pub async fn execute(
         &self,
         input: UpsertStoreItemListingInput,
-    ) -> Result<StoreItemListing, ApplicationError> {
+    ) -> Result<(), ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
         let store_catalog_id = StoreCatalogId::new(input.store_catalog_id);
         let item_id = ItemId::new(input.item_id);
+        let status = SellableStatus::parse(&input.status)?;
+        let display_rule = DisplayRule::parse(&input.display_rule)?;
 
         if self
             .store_catalog_repository
@@ -73,8 +75,8 @@ impl UpsertStoreItemListing {
             store_catalog_id,
             item_id,
             Price::new(input.price_amount)?,
-            input.status,
-            input.display_rule,
+            status,
+            display_rule,
             self.clock.now(),
         );
 
@@ -88,7 +90,7 @@ impl UpsertStoreItemListing {
         }
 
         self.transaction_manager.commit(tx).await?;
-        Ok(listing)
+        Ok(())
     }
 }
 
@@ -273,18 +275,18 @@ mod tests {
             }),
         );
 
-        let listing = use_case
+        use_case
             .execute(UpsertStoreItemListingInput {
                 store_catalog_id: "store-catalog-1".to_string(),
                 item_id: "item-1".to_string(),
                 price_amount: 3200,
-                status: SellableStatus::Sellable,
-                display_rule: DisplayRule::listed(),
+                status: "sellable".to_string(),
+                display_rule: "listed".to_string(),
             })
             .await
             .unwrap();
 
-        assert_eq!(listing.price().amount(), 3200);
+        assert_eq!(listing_repository.upserted.lock().unwrap()[0].price().amount(), 3200);
         assert_eq!(listing_repository.upserted.lock().unwrap().len(), 1);
     }
 }

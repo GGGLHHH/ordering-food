@@ -39,7 +39,7 @@ impl CreateCategory {
         }
     }
 
-    pub async fn execute(&self, input: CreateCategoryInput) -> Result<Category, ApplicationError> {
+    pub async fn execute(&self, input: CreateCategoryInput) -> Result<String, ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
         let brand_catalog_id = BrandCatalogId::new(input.brand_catalog_id);
 
@@ -72,7 +72,7 @@ impl CreateCategory {
         }
 
         self.transaction_manager.commit(tx).await?;
-        Ok(category)
+        Ok(category.id().as_str().to_string())
     }
 }
 
@@ -243,7 +243,7 @@ mod tests {
             Arc::new(FakeIdGenerator),
         );
 
-        let category = use_case
+        let category_id = use_case
             .execute(CreateCategoryInput {
                 brand_catalog_id: "brand-catalog-1".to_string(),
                 slug: "featured".to_string(),
@@ -254,7 +254,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(category.brand_catalog_id().as_str(), "brand-catalog-1");
+        assert!(!category_id.is_empty());
         assert_eq!(category_repository.inserted.lock().unwrap().len(), 1);
     }
 }

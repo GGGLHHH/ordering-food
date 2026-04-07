@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use ordering_food_catalog_application::{
     ApplicationError, StoreCatalogReadModel, StoreCatalogReadRepository,
 };
-use ordering_food_catalog_domain::{StoreCatalogId, StoreId};
 use sqlx::{PgPool, Row};
 
 #[derive(Clone)]
@@ -85,15 +84,15 @@ fn map_store_catalog_row(row: sqlx::postgres::PgRow) -> StoreCatalogReadModel {
 impl StoreCatalogReadRepository for SqlxStoreCatalogReadRepository {
     async fn find_by_id(
         &self,
-        store_catalog_id: &StoreCatalogId,
+        store_catalog_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError> {
-        SqlxStoreCatalogReadRepository::find_by_id(self, store_catalog_id.as_str()).await
+        SqlxStoreCatalogReadRepository::find_by_id(self, store_catalog_id).await
     }
 
     async fn find_by_store_id(
         &self,
-        store_id: &StoreId,
+        store_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError> {
-        SqlxStoreCatalogReadRepository::find_by_store_id(self, store_id.as_str()).await
+        SqlxStoreCatalogReadRepository::find_by_store_id(self, store_id).await
     }
 }

@@ -40,7 +40,7 @@ impl BootstrapBrandCatalog {
     pub async fn execute(
         &self,
         input: BootstrapBrandCatalogInput,
-    ) -> Result<BrandCatalog, ApplicationError> {
+    ) -> Result<String, ApplicationError> {
         let brand = self
             .organization_scope_reader
             .get_brand(&input.brand_id)
@@ -82,7 +82,7 @@ impl BootstrapBrandCatalog {
         }
 
         self.transaction_manager.commit(tx).await?;
-        Ok(brand_catalog)
+        Ok(brand_catalog.id().as_str().to_string())
     }
 }
 
@@ -284,7 +284,7 @@ mod tests {
             Arc::new(FakeIdGenerator),
         );
 
-        let brand_catalog = use_case
+        let brand_catalog_id = use_case
             .execute(BootstrapBrandCatalogInput {
                 brand_id: "brand-1".to_string(),
                 slug: "demo-catalog".to_string(),
@@ -293,7 +293,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(brand_catalog.brand_id().as_str(), "brand-1");
+        assert!(!brand_catalog_id.is_empty());
         assert_eq!(repository.inserted.lock().unwrap().len(), 1);
     }
 }

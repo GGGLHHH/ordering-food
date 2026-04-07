@@ -4,7 +4,6 @@ use ordering_food_catalog_application::{
     ApplicationError, CatalogItemListFilter, ItemReadModel, ItemReadRepository,
     StoreItemListingReadModel, StoreItemListingReadRepository,
 };
-use ordering_food_catalog_domain::{BrandCatalogId, ItemId, StoreCatalogId};
 use sqlx::{PgPool, Row};
 
 #[derive(Clone)]
@@ -169,12 +168,12 @@ fn map_listing_row(row: sqlx::postgres::PgRow) -> StoreItemListingReadModel {
 impl ItemReadRepository for SqlxItemReadRepository {
     async fn list_by_brand_catalog_id(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
         filter: CatalogItemListFilter,
     ) -> Result<Vec<ItemReadModel>, ApplicationError> {
         SqlxItemReadRepository::list_by_brand_catalog_id(
             self,
-            brand_catalog_id.as_str(),
+            brand_catalog_id,
             filter
                 .category_id
                 .as_ref()
@@ -185,18 +184,18 @@ impl ItemReadRepository for SqlxItemReadRepository {
 
     async fn find_by_id(
         &self,
-        item_id: &ItemId,
+        item_id: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError> {
-        SqlxItemReadRepository::find_by_id(self, item_id.as_str()).await
+        SqlxItemReadRepository::find_by_id(self, item_id).await
     }
 
     async fn find_by_slug(
         &self,
-        brand_catalog_id: &BrandCatalogId,
+        brand_catalog_id: &str,
         slug: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError> {
         let mut items =
-            SqlxItemReadRepository::list_by_brand_catalog_id(self, brand_catalog_id.as_str(), None)
+            SqlxItemReadRepository::list_by_brand_catalog_id(self, brand_catalog_id, None)
                 .await?;
         Ok(items
             .drain(..)
@@ -208,18 +207,18 @@ impl ItemReadRepository for SqlxItemReadRepository {
 impl StoreItemListingReadRepository for SqlxItemReadRepository {
     async fn find_by_item_id(
         &self,
-        store_catalog_id: &StoreCatalogId,
-        item_id: &ItemId,
+        store_catalog_id: &str,
+        item_id: &str,
     ) -> Result<Option<StoreItemListingReadModel>, ApplicationError> {
-        SqlxItemReadRepository::find_listing(self, store_catalog_id.as_str(), item_id.as_str())
+        SqlxItemReadRepository::find_listing(self, store_catalog_id, item_id)
             .await
     }
 
     async fn list_by_store_catalog_id(
         &self,
-        store_catalog_id: &StoreCatalogId,
+        store_catalog_id: &str,
     ) -> Result<Vec<StoreItemListingReadModel>, ApplicationError> {
-        SqlxItemReadRepository::list_listings_by_store_catalog_id(self, store_catalog_id.as_str())
+        SqlxItemReadRepository::list_listings_by_store_catalog_id(self, store_catalog_id)
             .await
     }
 }

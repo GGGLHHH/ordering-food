@@ -44,7 +44,7 @@ impl CreateItem {
         }
     }
 
-    pub async fn execute(&self, input: CreateItemInput) -> Result<Item, ApplicationError> {
+    pub async fn execute(&self, input: CreateItemInput) -> Result<String, ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
         let brand_catalog_id = BrandCatalogId::new(input.brand_catalog_id);
         let category_id = CategoryId::new(input.category_id);
@@ -91,7 +91,7 @@ impl CreateItem {
         }
 
         self.transaction_manager.commit(tx).await?;
-        Ok(item)
+        Ok(item.id().as_str().to_string())
     }
 }
 

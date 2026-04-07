@@ -4,7 +4,6 @@ use crate::{
     CreateCategoryInput, CreateItem, CreateItemInput, ItemQueryService, StoreCatalogQueryService,
     UpsertStoreItemListing, UpsertStoreItemListingInput,
 };
-use ordering_food_catalog_domain::{DisplayRule, SellableStatus};
 use ordering_food_organization_published::StoreSummary;
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -120,8 +119,8 @@ impl BootstrapDefaultCatalog {
                     store_catalog_id: store_catalog_id.clone(),
                     item_id,
                     price_amount: item.price_amount,
-                    status: SellableStatus::Sellable,
-                    display_rule: DisplayRule::listed(),
+                    status: "sellable".to_string(),
+                    display_rule: "listed".to_string(),
                 })
                 .await?;
         }
@@ -147,7 +146,7 @@ impl BootstrapDefaultCatalog {
         };
 
         match self.bootstrap_brand_catalog.execute(input).await {
-            Ok(brand_catalog) => Ok(brand_catalog.id().as_str().to_string()),
+            Ok(brand_catalog_id) => Ok(brand_catalog_id),
             Err(error @ ApplicationError::Conflict { .. }) => self
                 .brand_catalog_queries
                 .find_by_brand_id(&active_store.brand_id)
@@ -168,7 +167,7 @@ impl BootstrapDefaultCatalog {
         };
 
         match self.attach_store_catalog.execute(input).await {
-            Ok(store_catalog) => Ok(store_catalog.id().as_str().to_string()),
+            Ok(store_catalog_id) => Ok(store_catalog_id),
             Err(error @ ApplicationError::Conflict { .. }) => self
                 .store_catalog_queries
                 .find_by_store_id(&active_store.store_id)
@@ -195,7 +194,7 @@ impl BootstrapDefaultCatalog {
             })
             .await
         {
-            Ok(category) => Ok(category.id().as_str().to_string()),
+            Ok(category_id) => Ok(category_id),
             Err(error @ ApplicationError::Conflict { .. }) => self
                 .category_queries
                 .find_by_slug(brand_catalog_id, &seed.slug)
@@ -225,7 +224,7 @@ impl BootstrapDefaultCatalog {
             })
             .await
         {
-            Ok(item) => Ok(item.id().as_str().to_string()),
+            Ok(item_id) => Ok(item_id),
             Err(error @ ApplicationError::Conflict { .. }) => self
                 .item_queries
                 .find_by_slug(brand_catalog_id, &seed.slug)
