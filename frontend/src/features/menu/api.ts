@@ -5,10 +5,16 @@ import type {
   MenuItemsResponse,
   MenuStoreResponse,
 } from '#/contracts/generated'
+import {
+  CATALOG_CATEGORIES,
+  CATALOG_ITEMS,
+  CATALOG_STORE,
+  catalogItemPath,
+} from '#/contracts/openapi/helpers'
 import { requestJson } from '#/integrations/http'
 
 export function getMenuStore(signal?: AbortSignal) {
-  return requestJson<MenuStoreResponse>('catalog/store', {
+  return requestJson<MenuStoreResponse>(CATALOG_STORE, {
     authMode: 'none',
     method: 'GET',
     signal,
@@ -16,7 +22,7 @@ export function getMenuStore(signal?: AbortSignal) {
 }
 
 export function getMenuCategories(signal?: AbortSignal) {
-  return requestJson<MenuCategoriesResponse>('catalog/categories', {
+  return requestJson<MenuCategoriesResponse>(CATALOG_CATEGORIES, {
     authMode: 'none',
     method: 'GET',
     signal,
@@ -24,7 +30,7 @@ export function getMenuCategories(signal?: AbortSignal) {
 }
 
 export function getMenuItems(query: MenuItemsQuery = {}, signal?: AbortSignal) {
-  return requestJson<MenuItemsResponse>('catalog/items', {
+  return requestJson<MenuItemsResponse>(CATALOG_ITEMS, {
     authMode: 'none',
     method: 'GET',
     searchParams: sanitizeMenuItemsQuery(query),
@@ -33,7 +39,7 @@ export function getMenuItems(query: MenuItemsQuery = {}, signal?: AbortSignal) {
 }
 
 export function getMenuItem(itemId: string, signal?: AbortSignal) {
-  return requestJson<MenuItemResponse>(`catalog/items/${itemId}`, {
+  return requestJson<MenuItemResponse>(catalogItemPath(itemId), {
     authMode: 'none',
     method: 'GET',
     signal,
