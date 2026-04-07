@@ -10,3 +10,4 @@ pub mod runtime;
 #[cfg(test)]
 pub mod testing;
 pub mod ts_bindings;
+pub mod openapi_export;

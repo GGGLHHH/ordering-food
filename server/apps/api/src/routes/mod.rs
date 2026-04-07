@@ -73,7 +73,7 @@ pub fn router(
         router = router.nest(path, nested_router);
     }
 
-    let mut openapi = ApiDoc::openapi();
+    let mut openapi = crate::openapi_export::build_merged_openapi_document();
     for contribution in openapi_documents {
         openapi.merge(contribution);
     }
