@@ -17,7 +17,7 @@ describe('menu page', () => {
     const onCategoryChange = vi.fn()
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = getRequestUrl(input)
-      if (url.endsWith('/api/menu/store')) {
+      if (url.endsWith('/api/catalog/store')) {
         return createJsonResponse({
           currency_code: 'CNY',
           name: 'Ordering Food Demo Kitchen',
@@ -28,7 +28,7 @@ describe('menu page', () => {
         })
       }
 
-      if (url.endsWith('/api/menu/categories')) {
+      if (url.endsWith('/api/catalog/categories')) {
         return createJsonResponse({
           categories: [
             {
@@ -53,7 +53,7 @@ describe('menu page', () => {
         })
       }
 
-      if (url.includes('/api/menu/items')) {
+      if (url.includes('/api/catalog/items')) {
         return createJsonResponse({
           items: [
             {

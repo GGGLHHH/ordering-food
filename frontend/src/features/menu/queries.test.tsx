@@ -16,7 +16,7 @@ describe('menu query integration', () => {
   it('requests menu items with category slug filters', async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = getRequestUrl(input)
-      if (url.includes('/api/menu/items')) {
+      if (url.includes('/api/catalog/items')) {
         return createJsonResponse({
           items: [
             {
@@ -50,7 +50,7 @@ describe('menu query integration', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(getRequestUrl(fetchMock.mock.calls[0]?.[0])).toContain(
-      '/api/menu/items?category_slug=featured',
+      '/api/catalog/items?category_slug=featured',
     )
   })
 })
