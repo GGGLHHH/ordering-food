@@ -9,6 +9,10 @@ publish.workspace = true
 name = "ordering-food-server"
 path = "src/main.rs"
 
+[[bin]]
+name = "export-openapi"
+path = "src/bin/export-openapi.rs"
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
