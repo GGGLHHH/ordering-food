@@ -11,7 +11,7 @@ FULL_STACK_SERVICES := $(INFRA_SERVICES) server frontend nginx autoheal
 DATABASE_URL ?= $(shell awk -F= '/^DATABASE__URL=/{sub(/^DATABASE__URL=/, ""); print; exit}' $(ROOT_ENV_FILE))
 GENERATED_API_DIR ?= $(shell awk -F= '/^GENERATED_API_DIR=/{sub(/^GENERATED_API_DIR=/, ""); print; exit}' $(ROOT_ENV_FILE))
 
-.PHONY: help up compose-up down ps logs run dev export-ts export-openapi generate-api-types sync-api migration-up migration-down migration-create migration-info fmt fmt-check clippy test coverage check
+.PHONY: help up compose-up down ps logs run dev export-openapi generate-api-types generate-types-barrel sync-api migration-up migration-down migration-create migration-info fmt fmt-check clippy test coverage check
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -36,10 +36,6 @@ run: ## Run the Rust API with Bacon auto-reload
 
 dev: up run ## Start dependencies and enter the Bacon hot-reload loop
 
-export-ts: ## Export frontend TypeScript bindings from API contracts
-	@test -n "$(GENERATED_API_DIR)" || (echo "GENERATED_API_DIR is required, e.g. GENERATED_API_DIR=../frontend/src/contracts/generated" && exit 1)
-	cd $(SERVER_DIR) && GENERATED_API_DIR='$(GENERATED_API_DIR)' cargo run -p ordering-food-api --bin export-ts-bindings
-
 export-openapi: ## Export OpenAPI JSON from backend utoipa annotations
 	@test -n "$(GENERATED_API_DIR)" || (echo "GENERATED_API_DIR is required" && exit 1)
 	cd $(SERVER_DIR) && GENERATED_API_DIR='$(GENERATED_API_DIR)' cargo run -p ordering-food-api --bin export-openapi
@@ -47,7 +43,10 @@ export-openapi: ## Export OpenAPI JSON from backend utoipa annotations
 generate-api-types: export-openapi ## Generate TypeScript types from OpenAPI spec
 	cd $(FRONTEND_DIR) && vp dlx openapi-typescript src/contracts/openapi/openapi.json -o src/contracts/openapi/api-types.d.ts
 
-sync-api: export-ts export-openapi generate-api-types ## Full API contract sync (ts-rs + OpenAPI)
+generate-types-barrel: ## Generate types.ts barrel from OpenAPI schemas
+	cd $(FRONTEND_DIR) && node scripts/generate-types-barrel.mjs && vp fmt --write src/contracts/openapi/types.ts
+
+sync-api: export-openapi generate-api-types generate-types-barrel ## Full API contract sync (OpenAPI → TypeScript)
 
 migration-up: ## Apply pending database migrations with sqlx-cli
 	cd $(SERVER_DIR) && DATABASE_URL='$(DATABASE_URL)' $(SQLX) migrate run --source $(SQLX_MIGRATIONS_DIR)
