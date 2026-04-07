@@ -17,7 +17,6 @@ use ordering_food_identity_application::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use ts_rs::TS;
 use utoipa::{IntoParams, OpenApi, ToSchema};
 
 pub(crate) const IDENTITY_ROUTE_PREFIX: &str = "/api/identity";
@@ -79,57 +78,50 @@ pub fn router(module: Arc<IdentityModule>) -> Router<AppState> {
 )]
 pub struct IdentityApiDoc;
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct CreateIdentityUserRequest {
     pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub given_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub family_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub avatar_url: Option<String>,
     pub identities: Vec<CreateIdentityUserIdentityRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub password: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct CreateIdentityUserIdentityRequest {
     pub identity_type: String,
     pub identifier: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct UpdateIdentityUserProfileRequest {
     pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub given_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub family_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct BindIdentityUserIdentityRequest {
     pub identity_type: String,
     pub identifier: String,
 }
 
-#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Path)]
 pub struct IdentityUserPath {
     pub user_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct IdentityUserResponse {
     pub user_id: String,
     pub status: String,
@@ -138,25 +130,21 @@ pub struct IdentityUserResponse {
     pub created_at: String,
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub deleted_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct IdentityUserProfileResponse {
     pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub given_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub family_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct IdentityUserIdentityResponse {
     pub identity_type: String,
     pub identifier_normalized: String,

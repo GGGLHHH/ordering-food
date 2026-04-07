@@ -14,7 +14,6 @@ use ordering_food_fulfillment_application::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use ts_rs::TS;
 use utoipa::{IntoParams, OpenApi, ToSchema};
 
 pub(crate) const ORDER_ROUTE_PREFIX: &str = "/api/orders";
@@ -65,13 +64,13 @@ pub fn router(module: Arc<FulfillmentModule>) -> Router<AppState> {
 )]
 pub struct FulfillmentApiDoc;
 
-#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Path)]
 pub struct FulfillmentOrderPath {
     pub order_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FulfillmentOrderItemResponse {
     pub line_number: i32,
     pub catalog_item_id: String,
@@ -81,7 +80,7 @@ pub struct FulfillmentOrderItemResponse {
     pub line_total_amount: i64,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FulfillmentOrderResponse {
     pub order_id: String,
     pub customer_id: String,

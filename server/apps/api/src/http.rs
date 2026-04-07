@@ -11,7 +11,6 @@ use ordering_food_identity_published::AccessTokenVerifier;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{convert::Infallible, error::Error as StdError, ops::Deref, sync::Arc};
 use tower_http::request_id::RequestId;
-use ts_rs::TS;
 use utoipa::ToSchema;
 
 pub const API_BODY_LIMIT_BYTES: usize = 1024 * 1024;
@@ -229,7 +228,7 @@ pub struct PageResponse<T> {
     pub meta: PageMeta,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PageMeta {
     pub page: u64,
     pub page_size: u64,

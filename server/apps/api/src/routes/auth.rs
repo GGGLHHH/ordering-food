@@ -15,7 +15,6 @@ use ordering_food_identity_application::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use ts_rs::TS;
 use utoipa::{OpenApi, ToSchema};
 
 pub(crate) const AUTH_ROUTE_PREFIX: &str = "/api/auth";
@@ -56,20 +55,20 @@ pub fn router(module: Arc<IdentityModule>, auth_settings: AuthSettings) -> Route
 )]
 pub struct AuthApiDoc;
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct LoginRequest {
     pub identity_type: String,
     pub identifier: String,
     pub password: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AuthResponse {
     pub user_id: String,
     pub expires_in: u64,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AuthMeResponse {
     pub user_id: String,
     pub status: String,

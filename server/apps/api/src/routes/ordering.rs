@@ -15,7 +15,6 @@ use ordering_food_ordering_application::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use ts_rs::TS;
 use utoipa::{IntoParams, OpenApi, ToSchema};
 
 pub(crate) const ORDER_ROUTE_PREFIX: &str = "/api/orders";
@@ -63,7 +62,7 @@ pub fn router(module: Arc<OrderingModule>) -> Router<AppState> {
 )]
 pub struct OrderingApiDoc;
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct PlaceOrderItemRequest {
     pub catalog_item_id: String,
     pub name: String,
@@ -71,19 +70,19 @@ pub struct PlaceOrderItemRequest {
     pub quantity: i32,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct PlaceOrderRequest {
     pub store_id: String,
     pub items: Vec<PlaceOrderItemRequest>,
 }
 
-#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Path)]
 pub struct OrderPath {
     pub order_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OrderItemResponse {
     pub line_number: i32,
     pub catalog_item_id: String,
@@ -93,7 +92,7 @@ pub struct OrderItemResponse {
     pub line_total_amount: i64,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OrderResponse {
     pub order_id: String,
     pub customer_id: String,
@@ -106,7 +105,7 @@ pub struct OrderResponse {
     pub items: Vec<OrderItemResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OrderListItemResponse {
     pub order_id: String,
     pub store_id: String,
@@ -118,7 +117,7 @@ pub struct OrderListItemResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OrderListResponse {
     pub orders: Vec<OrderListItemResponse>,
 }

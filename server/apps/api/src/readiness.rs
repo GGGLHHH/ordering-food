@@ -7,21 +7,20 @@ use redis::aio::MultiplexedConnection;
 use serde::Serialize;
 use sqlx::PgPool;
 use std::collections::BTreeMap;
-use ts_rs::TS;
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct LiveResponse {
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ReadyResponse {
     pub status: String,
     pub checks: DependencyChecks,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct DependencyChecks {
     pub postgres: String,
     pub redis: String,

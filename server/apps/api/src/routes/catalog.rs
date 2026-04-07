@@ -10,7 +10,6 @@ use ordering_food_catalog_application::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
-use ts_rs::TS;
 use utoipa::{IntoParams, OpenApi, ToSchema};
 
 pub(crate) const CATALOG_ROUTE_PREFIX: &str = "/api/catalog";
@@ -55,7 +54,7 @@ pub fn router(module: Arc<CatalogModule>) -> Router<AppState> {
 )]
 pub struct CatalogApiDoc;
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CatalogStoreCatalogResponse {
     pub brand_catalog_id: String,
     pub store_catalog_id: String,
@@ -69,40 +68,37 @@ pub struct CatalogStoreCatalogResponse {
     pub display_rule: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CatalogCategoryResponse {
     pub category_id: String,
     pub brand_catalog_id: String,
     pub slug: String,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub description: Option<String>,
     pub sort_order: i32,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CatalogCategoriesResponse {
     pub categories: Vec<CatalogCategoryResponse>,
 }
 
-#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
 pub struct CatalogItemsQuery {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub category_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub category_slug: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, TS)]
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Path)]
 pub struct CatalogItemPath {
     pub item_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CatalogItemResponse {
     pub item_id: String,
     pub brand_catalog_id: String,
@@ -111,10 +107,8 @@ pub struct CatalogItemResponse {
     pub slug: String,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
     pub image_url: Option<String>,
     pub price_amount: i64,
     pub status: String,
@@ -122,7 +116,7 @@ pub struct CatalogItemResponse {
     pub sort_order: i32,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema, TS)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CatalogItemsResponse {
     pub items: Vec<CatalogItemResponse>,
 }

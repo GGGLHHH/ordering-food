@@ -8,7 +8,6 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 use utoipa::{IntoParams, OpenApi, ToSchema};
 
 pub(crate) const EXAMPLE_ECHO_PATH: &str = "/examples/echo";
@@ -39,6 +38,8 @@ pub fn router() -> Router<AppState> {
             ExamplePayload,
             ExamplePayloadResponse,
             ExampleSearchResponse,
+            ExampleSearchQuery,
+            ExampleItemPath,
             ExampleItemResponse,
         )
     ),
@@ -48,35 +49,35 @@ pub fn router() -> Router<AppState> {
 )]
 pub struct ApiGroupDoc;
 
-#[derive(Debug, Deserialize, Serialize, ToSchema, TS)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ExamplePayload {
     pub name: String,
     pub quantity: u32,
 }
 
-#[derive(Debug, Serialize, ToSchema, TS)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ExamplePayloadResponse {
     pub accepted: bool,
     pub payload: ExamplePayload,
 }
 
-#[derive(Debug, Deserialize, IntoParams, TS)]
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct ExampleSearchQuery {
     pub page: u32,
 }
 
-#[derive(Debug, Serialize, ToSchema, TS)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ExampleSearchResponse {
     pub page: u32,
 }
 
-#[derive(Debug, Deserialize, IntoParams, TS)]
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Path)]
 pub struct ExampleItemPath {
     pub item_id: u64,
 }
 
-#[derive(Debug, Serialize, ToSchema, TS)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ExampleItemResponse {
     pub item_id: u64,
 }
