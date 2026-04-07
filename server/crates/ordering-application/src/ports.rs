@@ -48,7 +48,7 @@ pub trait OrderRepository: Send + Sync {
 pub trait OrderReadRepository: Send + Sync {
     async fn get_by_id(
         &self,
-        order_id: &OrderId,
+        order_id: &str,
     ) -> Result<Option<OrderReadModel>, ApplicationError>;
 
     async fn list_by_customer(
@@ -92,7 +92,7 @@ impl OrderQueryService {
         &self,
         order_id: &str,
     ) -> Result<Option<OrderReadModel>, ApplicationError> {
-        self.repository.get_by_id(&OrderId::new(order_id)).await
+        self.repository.get_by_id(order_id).await
     }
 
     pub async fn list_by_customer(

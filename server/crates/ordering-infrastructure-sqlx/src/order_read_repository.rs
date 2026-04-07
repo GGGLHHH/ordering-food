@@ -4,8 +4,6 @@ use ordering_food_ordering_application::{
     ApplicationError, OrderItemReadModel, OrderListItemReadModel, OrderReadModel,
     OrderReadRepository,
 };
-use ordering_food_ordering_domain::OrderId;
-use ordering_food_shared_kernel::Identifier;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -19,8 +17,8 @@ impl SqlxOrderReadRepository {
         Self { pool }
     }
 
-    fn parse_order_id(order_id: &OrderId) -> Result<Uuid, ApplicationError> {
-        Uuid::parse_str(order_id.as_str())
+    fn parse_order_id(order_id: &str) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(order_id)
             .map_err(|_| ApplicationError::validation("order id must be a valid UUID"))
     }
 }
@@ -29,7 +27,7 @@ impl SqlxOrderReadRepository {
 impl OrderReadRepository for SqlxOrderReadRepository {
     async fn get_by_id(
         &self,
-        order_id: &OrderId,
+        order_id: &str,
     ) -> Result<Option<OrderReadModel>, ApplicationError> {
         let order_id = Self::parse_order_id(order_id)?;
         let row = sqlx::query(

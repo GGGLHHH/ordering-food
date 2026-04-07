@@ -503,7 +503,7 @@ mod tests {
     impl OrderReadRepository for InMemoryOrderRepository {
         async fn get_by_id(
             &self,
-            order_id: &OrderId,
+            order_id: &str,
         ) -> Result<Option<ordering_food_ordering_application::OrderReadModel>, ApplicationError>
         {
             Ok(self
@@ -511,7 +511,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .orders
-                .get(order_id.as_str())
+                .get(order_id)
                 .map(|order| ordering_food_ordering_application::OrderReadModel {
                     order_id: order.id().as_str().to_string(),
                     customer_id: order.customer_id().as_str().to_string(),
