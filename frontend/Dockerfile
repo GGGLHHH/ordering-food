@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS builder
+FROM node:22-bookworm AS builder
 
 RUN corepack enable && npm i -g vite-plus
 
