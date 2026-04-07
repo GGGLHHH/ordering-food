@@ -139,7 +139,7 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
               {categories.map((category) => (
                 <FilterButton
                   key={category.category_id}
-                  description={category.description}
+                  description={category.description ?? undefined}
                   isActive={category.slug === activeCategorySlug}
                   label={category.name}
                   onClick={() => {

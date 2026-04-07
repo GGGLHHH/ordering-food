@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
-import type { PlaceOrderRequest } from '#/contracts/generated'
+import type { PlaceOrderRequest } from '#/contracts/openapi/types'
 
 import { getOrder, listOrders, placeOrder } from './api'
 

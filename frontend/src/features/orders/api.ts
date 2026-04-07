@@ -1,4 +1,4 @@
-import type { OrderListResponse, OrderResponse, PlaceOrderRequest } from '#/contracts/generated'
+import type { OrderListResponse, OrderResponse, PlaceOrderRequest } from '#/contracts/openapi/types'
 import { requestJson } from '#/integrations/http'
 
 export function placeOrder(payload: PlaceOrderRequest, signal?: AbortSignal) {

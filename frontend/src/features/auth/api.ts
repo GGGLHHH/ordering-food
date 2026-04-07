@@ -1,4 +1,4 @@
-import type { AuthMeResponse, AuthResponse, LoginRequest } from '#/contracts/generated'
+import type { AuthMeResponse, AuthResponse, LoginRequest } from '#/contracts/openapi/types'
 import { type AuthMode, requestJson, requestVoid } from '#/integrations/http'
 
 interface AuthApiOptions {

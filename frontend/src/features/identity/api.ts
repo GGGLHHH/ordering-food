@@ -3,7 +3,7 @@ import type {
   CreateIdentityUserRequest,
   IdentityUserResponse,
   UpdateIdentityUserProfileRequest,
-} from '#/contracts/generated'
+} from '#/contracts/openapi/types'
 import { requestJson } from '#/integrations/http'
 
 export function createIdentityUser(payload: CreateIdentityUserRequest, signal?: AbortSignal) {

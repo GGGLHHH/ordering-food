@@ -4,7 +4,7 @@ import type {
   BindIdentityUserIdentityRequest,
   CreateIdentityUserRequest,
   UpdateIdentityUserProfileRequest,
-} from '#/contracts/generated'
+} from '#/contracts/openapi/types'
 
 import {
   bindIdentityUserIdentity,

@@ -1,4 +1,4 @@
-import type { ErrorDetails, ErrorEnvelope } from '#/contracts/generated'
+import type { ErrorDetails, ErrorEnvelope } from '#/contracts/openapi/types'
 
 export interface ApiErrorInit {
   cause?: unknown
@@ -41,10 +41,10 @@ export function createHttpApiError(
   return new ApiError({
     cause,
     code: envelope?.code ?? `http_${status}`,
-    details: envelope?.details,
+    details: envelope?.details ?? undefined,
     isRetryable: status >= 500,
     message: envelope?.message ?? `Request failed with status ${status}`,
-    requestId: envelope?.request_id,
+    requestId: envelope?.request_id ?? undefined,
     status,
   })
 }

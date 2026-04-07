@@ -5,7 +5,7 @@ import type {
   ExamplePayloadResponse,
   ExampleSearchQuery,
   ExampleSearchResponse,
-} from '#/contracts/generated'
+} from '#/contracts/openapi/types'
 import { requestJson } from '#/integrations/http'
 
 export function echoExamplePayload(payload: ExamplePayload, signal?: AbortSignal) {
@@ -21,7 +21,7 @@ export function searchExamples(query: ExampleSearchQuery, signal?: AbortSignal) 
   return requestJson<ExampleSearchResponse>('examples/search', {
     authMode: 'none',
     method: 'GET',
-    searchParams: query,
+    searchParams: { page: String(query.page) },
     signal,
   })
 }

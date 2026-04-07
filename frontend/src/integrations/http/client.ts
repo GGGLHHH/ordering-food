@@ -1,6 +1,6 @@
 import ky, { HTTPError, type KyInstance, type Options, TimeoutError } from 'ky'
 
-import type { ErrorEnvelope } from '#/contracts/generated'
+import type { ErrorEnvelope } from '#/contracts/openapi/types'
 
 import {
   ApiError,

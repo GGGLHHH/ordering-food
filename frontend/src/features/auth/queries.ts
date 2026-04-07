@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 
-import type { AuthMeResponse, LoginRequest } from '#/contracts/generated'
+import type { AuthMeResponse, LoginRequest } from '#/contracts/openapi/types'
 import { ApiError, isAbortError } from '#/integrations/http'
 
 import { getCurrentUser, login, logout } from './api'

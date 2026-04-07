@@ -1,16 +1,16 @@
-import type {
-  MenuCategoriesResponse,
-  MenuItemResponse,
-  MenuItemsQuery,
-  MenuItemsResponse,
-  MenuStoreResponse,
-} from '#/contracts/generated'
 import {
   CATALOG_CATEGORIES,
   CATALOG_ITEMS,
   CATALOG_STORE,
   catalogItemPath,
 } from '#/contracts/openapi/helpers'
+import type {
+  MenuCategoriesResponse,
+  MenuItemResponse,
+  MenuItemsQuery,
+  MenuItemsResponse,
+  MenuStoreResponse,
+} from '#/contracts/openapi/types'
 import { requestJson } from '#/integrations/http'
 
 export function getMenuStore(signal?: AbortSignal) {
