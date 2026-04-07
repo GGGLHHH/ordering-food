@@ -8,7 +8,7 @@ import type {
 import { requestJson } from '#/integrations/http'
 
 export function getMenuStore(signal?: AbortSignal) {
-  return requestJson<MenuStoreResponse>('menu/store', {
+  return requestJson<MenuStoreResponse>('catalog/store', {
     authMode: 'none',
     method: 'GET',
     signal,
@@ -16,7 +16,7 @@ export function getMenuStore(signal?: AbortSignal) {
 }
 
 export function getMenuCategories(signal?: AbortSignal) {
-  return requestJson<MenuCategoriesResponse>('menu/categories', {
+  return requestJson<MenuCategoriesResponse>('catalog/categories', {
     authMode: 'none',
     method: 'GET',
     signal,
@@ -24,7 +24,7 @@ export function getMenuCategories(signal?: AbortSignal) {
 }
 
 export function getMenuItems(query: MenuItemsQuery = {}, signal?: AbortSignal) {
-  return requestJson<MenuItemsResponse>('menu/items', {
+  return requestJson<MenuItemsResponse>('catalog/items', {
     authMode: 'none',
     method: 'GET',
     searchParams: sanitizeMenuItemsQuery(query),
@@ -33,7 +33,7 @@ export function getMenuItems(query: MenuItemsQuery = {}, signal?: AbortSignal) {
 }
 
 export function getMenuItem(itemId: string, signal?: AbortSignal) {
-  return requestJson<MenuItemResponse>(`menu/items/${itemId}`, {
+  return requestJson<MenuItemResponse>(`catalog/items/${itemId}`, {
     authMode: 'none',
     method: 'GET',
     signal,

@@ -164,7 +164,7 @@ export function OrderPage({ orderId }: OrderPageProps) {
 
           {order.items.map((item, index) => (
             <article
-              key={`${item.line_number}-${item.menu_item_id}`}
+              key={`${item.line_number}-${item.catalog_item_id}`}
               className="island-shell rise-in rounded-[1.6rem] p-5"
               style={{ animationDelay: `${index * 60 + 60}ms` }}
             >
@@ -181,7 +181,7 @@ export function OrderPage({ orderId }: OrderPageProps) {
               </div>
 
               <div className="grid gap-2 text-sm text-[var(--sea-ink-soft)] sm:grid-cols-3">
-                <p className="m-0">Menu item: {item.menu_item_id}</p>
+                <p className="m-0">Catalog item: {item.catalog_item_id}</p>
                 <p className="m-0">Unit price: {formatMoney(item.unit_price_amount)}</p>
                 <p className="m-0">Quantity: {item.quantity}</p>
               </div>

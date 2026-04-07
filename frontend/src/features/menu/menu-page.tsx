@@ -67,7 +67,7 @@ export function MenuPage({ onCategoryChange, selectedCategorySlug }: MenuPagePro
 
     const order = await placeOrderMutation.mutateAsync({
       items: selectedItems.map((item) => ({
-        menu_item_id: item.item_id,
+        catalog_item_id: item.brand_catalog_id,
         name: item.name,
         quantity: item.quantity,
         unit_price_amount: item.price_amount,
