@@ -3,8 +3,6 @@ use ordering_food_identity_application::{
     ApplicationError, UserIdentityReadModel, UserProfileReadModel, UserReadModel,
     UserReadRepository,
 };
-use ordering_food_identity_domain::UserId;
-use ordering_food_shared_kernel::Identifier;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -18,15 +16,15 @@ impl SqlxUserReadRepository {
         Self { pool }
     }
 
-    fn parse_user_id(user_id: &UserId) -> Result<Uuid, ApplicationError> {
-        Uuid::parse_str(user_id.as_str())
+    fn parse_user_id(user_id: &str) -> Result<Uuid, ApplicationError> {
+        Uuid::parse_str(user_id)
             .map_err(|_| ApplicationError::validation("user id must be a valid UUID"))
     }
 }
 
 #[async_trait]
 impl UserReadRepository for SqlxUserReadRepository {
-    async fn get_by_id(&self, user_id: &UserId) -> Result<Option<UserReadModel>, ApplicationError> {
+    async fn get_by_id(&self, user_id: &str) -> Result<Option<UserReadModel>, ApplicationError> {
         let user_id = Self::parse_user_id(user_id)?;
         let row = sqlx::query(
             r#"

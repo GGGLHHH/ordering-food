@@ -48,7 +48,7 @@ pub trait IdentityUnitOfWorkFactory: Send + Sync {
 
 #[async_trait]
 pub trait UserReadRepository: Send + Sync {
-    async fn get_by_id(&self, user_id: &UserId) -> Result<Option<UserReadModel>, ApplicationError>;
+    async fn get_by_id(&self, user_id: &str) -> Result<Option<UserReadModel>, ApplicationError>;
 }
 
 #[derive(Clone)]
@@ -65,7 +65,7 @@ impl UserQueryService {
         &self,
         user_id: &str,
     ) -> Result<Option<UserReadModel>, ApplicationError> {
-        self.repository.get_by_id(&UserId::new(user_id)).await
+        self.repository.get_by_id(user_id).await
     }
 }
 

@@ -34,12 +34,12 @@ impl FakeIdentityStore {
 
 #[async_trait]
 impl UserReadRepository for FakeIdentityStore {
-    async fn get_by_id(&self, user_id: &UserId) -> Result<Option<UserReadModel>, ApplicationError> {
+    async fn get_by_id(&self, user_id: &str) -> Result<Option<UserReadModel>, ApplicationError> {
         Ok(self
             .users
             .lock()
             .unwrap()
-            .get(user_id.as_str())
+            .get(user_id)
             .map(map_user_to_read_model))
     }
 }

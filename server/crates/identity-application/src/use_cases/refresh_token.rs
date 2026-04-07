@@ -1,5 +1,5 @@
 use crate::{ApplicationError, RefreshTokenStore, TokenPair, TokenService, UserReadRepository};
-use ordering_food_identity_domain::{UserId, UserStatus};
+use ordering_food_identity_domain::UserStatus;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ impl RefreshToken {
 
         let user = self
             .user_read_repository
-            .get_by_id(&UserId::new(&user_id))
+            .get_by_id(&user_id)
             .await?
             .ok_or_else(|| ApplicationError::unauthorized("invalid refresh token"))?;
 
@@ -189,9 +189,9 @@ mod tests {
     impl UserReadRepository for FakeUserReadRepository {
         async fn get_by_id(
             &self,
-            user_id: &UserId,
+            user_id: &str,
         ) -> Result<Option<UserReadModel>, ApplicationError> {
-            Ok(self.users.lock().unwrap().get(user_id.as_str()).cloned())
+            Ok(self.users.lock().unwrap().get(user_id).cloned())
         }
     }
 
