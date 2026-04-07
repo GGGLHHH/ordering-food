@@ -1,31 +1,32 @@
+use crate::{
+    credential_repository::{find_credential_by_user_id, upsert_credential},
+    user_repository::{find_user_by_id, find_user_by_identity, insert_user, update_user},
+};
 use async_trait::async_trait;
 use ordering_food_identity_application::{
-    ApplicationError, TransactionContext, TransactionManager,
+    ApplicationError, IdentityUnitOfWork, IdentityUnitOfWorkFactory, StoredCredential,
 };
+use ordering_food_identity_domain::{IdentityType, NormalizedIdentifier, User, UserId};
+use ordering_food_shared_kernel::Timestamp;
 use sqlx::{PgPool, Postgres, Transaction};
-use std::any::Any;
 
-pub struct SqlxTransactionContext {
+pub struct SqlxIdentityUnitOfWork {
     transaction: Transaction<'static, Postgres>,
 }
 
-impl SqlxTransactionContext {
+impl SqlxIdentityUnitOfWork {
     pub fn new(transaction: Transaction<'static, Postgres>) -> Self {
         Self { transaction }
     }
 
-    pub fn transaction_mut(&mut self) -> &mut Transaction<'static, Postgres> {
-        &mut self.transaction
-    }
-
-    async fn commit(self: Box<Self>) -> Result<(), ApplicationError> {
+    async fn commit_inner(self: Box<Self>) -> Result<(), ApplicationError> {
         let Self { transaction } = *self;
         transaction.commit().await.map_err(|error| {
             ApplicationError::unexpected_with_source("failed to commit identity transaction", error)
         })
     }
 
-    async fn rollback(self: Box<Self>) -> Result<(), ApplicationError> {
+    async fn rollback_inner(self: Box<Self>) -> Result<(), ApplicationError> {
         let Self { transaction } = *self;
         transaction.rollback().await.map_err(|error| {
             ApplicationError::unexpected_with_source(
@@ -36,82 +37,98 @@ impl SqlxTransactionContext {
     }
 }
 
-impl TransactionContext for SqlxTransactionContext {
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+#[async_trait]
+impl IdentityUnitOfWork for SqlxIdentityUnitOfWork {
+    async fn find_user_by_id(
+        &mut self,
+        user_id: &UserId,
+    ) -> Result<Option<User>, ApplicationError> {
+        find_user_by_id(&mut self.transaction, user_id).await
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-        self
+    async fn find_user_by_identity(
+        &mut self,
+        identity_type: &IdentityType,
+        identifier: &NormalizedIdentifier,
+    ) -> Result<Option<User>, ApplicationError> {
+        find_user_by_identity(&mut self.transaction, identity_type, identifier).await
+    }
+
+    async fn insert_user(&mut self, user: &User) -> Result<(), ApplicationError> {
+        insert_user(&mut self.transaction, user).await
+    }
+
+    async fn update_user(&mut self, user: &User) -> Result<(), ApplicationError> {
+        update_user(&mut self.transaction, user).await
+    }
+
+    async fn find_credential_by_user_id(
+        &mut self,
+        user_id: &UserId,
+    ) -> Result<Option<StoredCredential>, ApplicationError> {
+        find_credential_by_user_id(&mut self.transaction, user_id).await
+    }
+
+    async fn upsert_credential(
+        &mut self,
+        user_id: &UserId,
+        password_hash: &str,
+        now: Timestamp,
+    ) -> Result<(), ApplicationError> {
+        upsert_credential(&mut self.transaction, user_id, password_hash, now).await
+    }
+
+    async fn commit(self: Box<Self>) -> Result<(), ApplicationError> {
+        self.commit_inner().await
+    }
+
+    async fn rollback(self: Box<Self>) -> Result<(), ApplicationError> {
+        self.rollback_inner().await
     }
 }
 
 #[derive(Clone)]
-pub struct SqlxTransactionManager {
+pub struct SqlxIdentityUnitOfWorkFactory {
     pool: PgPool,
 }
 
-impl SqlxTransactionManager {
+impl SqlxIdentityUnitOfWorkFactory {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
-    }
-
-    fn downcast_context(
-        tx: Box<dyn TransactionContext>,
-    ) -> Result<Box<SqlxTransactionContext>, ApplicationError> {
-        tx.into_any()
-            .downcast::<SqlxTransactionContext>()
-            .map_err(|_| {
-                ApplicationError::unexpected("unexpected transaction context implementation")
-            })
     }
 }
 
 #[async_trait]
-impl TransactionManager for SqlxTransactionManager {
-    async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
+impl IdentityUnitOfWorkFactory for SqlxIdentityUnitOfWorkFactory {
+    async fn begin(&self) -> Result<Box<dyn IdentityUnitOfWork>, ApplicationError> {
         let transaction = self.pool.begin().await.map_err(|error| {
             ApplicationError::unexpected_with_source("failed to begin identity transaction", error)
         })?;
 
-        Ok(Box::new(SqlxTransactionContext::new(transaction)))
-    }
-
-    async fn commit(&self, tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        Self::downcast_context(tx)?.commit().await
-    }
-
-    async fn rollback(&self, tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        Self::downcast_context(tx)?.rollback().await
+        Ok(Box::new(SqlxIdentityUnitOfWork::new(transaction)))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ordering_food_identity_domain::{User, UserProfile};
+    use sqlx::{PgPool, types::time::OffsetDateTime};
     use uuid::Uuid;
 
     #[sqlx::test(migrator = "ordering_food_database_infrastructure_sqlx::MIGRATOR")]
     async fn commit_persists_changes(pool: PgPool) {
-        let manager = SqlxTransactionManager::new(pool.clone());
+        let factory = SqlxIdentityUnitOfWorkFactory::new(pool.clone());
         let user_id = Uuid::now_v7();
+        let user = User::create(
+            UserId::new(user_id.to_string()),
+            UserProfile::new("Alice", None, None, None).unwrap(),
+            OffsetDateTime::now_utc(),
+        );
 
-        let mut tx = manager.begin().await.unwrap();
-        let transaction = tx
-            .as_any_mut()
-            .downcast_mut::<SqlxTransactionContext>()
-            .unwrap()
-            .transaction_mut();
-
-        sqlx::query(
-            "INSERT INTO identity.users (id, status, created_at, updated_at, deleted_at) VALUES ($1, 'active', NOW(), NOW(), NULL)",
-        )
-        .bind(user_id)
-        .execute(&mut **transaction)
-        .await
-        .unwrap();
-
-        manager.commit(tx).await.unwrap();
+        let mut unit_of_work = factory.begin().await.unwrap();
+        unit_of_work.insert_user(&user).await.unwrap();
+        unit_of_work.commit().await.unwrap();
 
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.users WHERE id = $1")
             .bind(user_id)
@@ -129,25 +146,17 @@ mod tests {
 
     #[sqlx::test(migrator = "ordering_food_database_infrastructure_sqlx::MIGRATOR")]
     async fn rollback_discards_changes(pool: PgPool) {
-        let manager = SqlxTransactionManager::new(pool.clone());
+        let factory = SqlxIdentityUnitOfWorkFactory::new(pool.clone());
         let user_id = Uuid::now_v7();
+        let user = User::create(
+            UserId::new(user_id.to_string()),
+            UserProfile::new("Alice", None, None, None).unwrap(),
+            OffsetDateTime::now_utc(),
+        );
 
-        let mut tx = manager.begin().await.unwrap();
-        let transaction = tx
-            .as_any_mut()
-            .downcast_mut::<SqlxTransactionContext>()
-            .unwrap()
-            .transaction_mut();
-
-        sqlx::query(
-            "INSERT INTO identity.users (id, status, created_at, updated_at, deleted_at) VALUES ($1, 'active', NOW(), NOW(), NULL)",
-        )
-        .bind(user_id)
-        .execute(&mut **transaction)
-        .await
-        .unwrap();
-
-        manager.rollback(tx).await.unwrap();
+        let mut unit_of_work = factory.begin().await.unwrap();
+        unit_of_work.insert_user(&user).await.unwrap();
+        unit_of_work.rollback().await.unwrap();
 
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.users WHERE id = $1")
             .bind(user_id)

@@ -2,56 +2,48 @@ use crate::{AccessTokenClaims, TokenPair};
 use crate::{ApplicationError, StoredCredential, UserReadModel};
 use async_trait::async_trait;
 use ordering_food_identity_domain::{IdentityType, NormalizedIdentifier, User, UserId};
+pub use ordering_food_platform_kernel::Clock;
 use ordering_food_shared_kernel::Timestamp;
-use std::any::Any;
 use std::sync::Arc;
-
-pub trait Clock: Send + Sync {
-    fn now(&self) -> Timestamp;
-}
 
 pub trait IdGenerator: Send + Sync {
     fn next_user_id(&self) -> UserId;
 }
 
-pub trait TransactionContext: Send {
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-    fn into_any(self: Box<Self>) -> Box<dyn Any + Send>;
-}
-
 #[async_trait]
-pub trait TransactionManager: Send + Sync {
-    async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError>;
-    async fn commit(&self, tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError>;
-    async fn rollback(&self, tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError>;
-}
+pub trait IdentityUnitOfWork: Send {
+    async fn find_user_by_id(&mut self, user_id: &UserId)
+    -> Result<Option<User>, ApplicationError>;
 
-#[async_trait]
-pub trait UserRepository: Send + Sync {
-    async fn find_by_id(
-        &self,
-        tx: &mut dyn TransactionContext,
-        user_id: &UserId,
-    ) -> Result<Option<User>, ApplicationError>;
-
-    async fn find_by_identity(
-        &self,
-        tx: &mut dyn TransactionContext,
+    async fn find_user_by_identity(
+        &mut self,
         identity_type: &IdentityType,
         identifier: &NormalizedIdentifier,
     ) -> Result<Option<User>, ApplicationError>;
 
-    async fn insert(
-        &self,
-        tx: &mut dyn TransactionContext,
-        user: &User,
+    async fn insert_user(&mut self, user: &User) -> Result<(), ApplicationError>;
+
+    async fn update_user(&mut self, user: &User) -> Result<(), ApplicationError>;
+
+    async fn find_credential_by_user_id(
+        &mut self,
+        user_id: &UserId,
+    ) -> Result<Option<StoredCredential>, ApplicationError>;
+
+    async fn upsert_credential(
+        &mut self,
+        user_id: &UserId,
+        password_hash: &str,
+        now: Timestamp,
     ) -> Result<(), ApplicationError>;
 
-    async fn update(
-        &self,
-        tx: &mut dyn TransactionContext,
-        user: &User,
-    ) -> Result<(), ApplicationError>;
+    async fn commit(self: Box<Self>) -> Result<(), ApplicationError>;
+    async fn rollback(self: Box<Self>) -> Result<(), ApplicationError>;
+}
+
+#[async_trait]
+pub trait IdentityUnitOfWorkFactory: Send + Sync {
+    async fn begin(&self) -> Result<Box<dyn IdentityUnitOfWork>, ApplicationError>;
 }
 
 #[async_trait]
@@ -71,9 +63,9 @@ impl UserQueryService {
 
     pub async fn get_by_id(
         &self,
-        user_id: &UserId,
+        user_id: &str,
     ) -> Result<Option<UserReadModel>, ApplicationError> {
-        self.repository.get_by_id(user_id).await
+        self.repository.get_by_id(&UserId::new(user_id)).await
     }
 }
 
@@ -81,23 +73,6 @@ impl UserQueryService {
 pub trait PasswordHasher: Send + Sync {
     async fn hash(&self, raw_password: &str) -> Result<String, ApplicationError>;
     async fn verify(&self, raw_password: &str, hash: &str) -> Result<bool, ApplicationError>;
-}
-
-#[async_trait]
-pub trait CredentialRepository: Send + Sync {
-    async fn find_by_user_id(
-        &self,
-        tx: &mut dyn TransactionContext,
-        user_id: &UserId,
-    ) -> Result<Option<StoredCredential>, ApplicationError>;
-
-    async fn upsert(
-        &self,
-        tx: &mut dyn TransactionContext,
-        user_id: &UserId,
-        password_hash: &str,
-        now: Timestamp,
-    ) -> Result<(), ApplicationError>;
 }
 
 #[async_trait]

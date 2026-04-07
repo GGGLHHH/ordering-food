@@ -1,3 +1,4 @@
+pub mod capabilities;
 pub mod context_registration;
 pub mod contexts;
 pub mod contribution;

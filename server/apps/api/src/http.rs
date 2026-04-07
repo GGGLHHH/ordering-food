@@ -7,7 +7,7 @@ use axum::{
     extract::{FromRequest, FromRequestParts, MatchedPath, Path, Query, Request},
     http::request::Parts,
 };
-use ordering_food_identity_application::TokenService;
+use ordering_food_identity_published::AccessTokenVerifier;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{convert::Infallible, error::Error as StdError, ops::Deref, sync::Arc};
 use tower_http::request_id::RequestId;
@@ -59,11 +59,11 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthenticatedUser {
-    pub user_id: String,
+pub struct AuthenticatedSubject {
+    pub subject_id: String,
 }
 
-impl<S> FromRequestParts<S> for AuthenticatedUser
+impl<S> FromRequestParts<S> for AuthenticatedSubject
 where
     S: Send + Sync,
 {
@@ -72,11 +72,11 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let context = RequestContext::from_parts(parts);
 
-        let token_service = parts
+        let token_verifier = parts
             .extensions
-            .get::<Arc<dyn TokenService>>()
+            .get::<Arc<dyn AccessTokenVerifier>>()
             .ok_or_else(|| {
-                AppError::internal("token service not configured")
+                AppError::internal("token verifier not configured")
                     .with_request_id(context.request_id.clone())
             })?
             .clone();
@@ -92,15 +92,16 @@ where
                 .with_request_id(context.request_id.clone())
         })?;
 
-        let claims = token_service
-            .verify_access_token(&access_token)
-            .map_err(|_| {
-                AppError::unauthorized("invalid or expired access token")
-                    .with_request_id(context.request_id.clone())
-            })?;
+        let authenticated_subject =
+            token_verifier
+                .verify_access_token(&access_token)
+                .map_err(|_| {
+                    AppError::unauthorized("invalid or expired access token")
+                        .with_request_id(context.request_id.clone())
+                })?;
 
-        Ok(AuthenticatedUser {
-            user_id: claims.user_id,
+        Ok(AuthenticatedSubject {
+            subject_id: authenticated_subject.subject_id().to_string(),
         })
     }
 }

@@ -2,7 +2,7 @@ use crate::{
     app::AppState,
     config::AuthSettings,
     error::{AppError, ErrorEnvelope},
-    http::{self, ApiJson, AuthenticatedUser, RequestContext},
+    http::{self, ApiJson, AuthenticatedSubject, RequestContext},
 };
 use axum::{
     Extension, Json, Router,
@@ -13,7 +13,6 @@ use axum::{
 use ordering_food_identity_application::{
     ApplicationError, IdentityModule, LoginInput, LogoutInput, RefreshTokenInput,
 };
-use ordering_food_identity_domain::UserId;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ts_rs::TS;
@@ -96,7 +95,7 @@ pub async fn login(
     ApiJson(payload): ApiJson<LoginRequest>,
 ) -> Result<(StatusCode, HeaderMap, Json<AuthResponse>), AppError> {
     let output = module
-        .login
+        .login()
         .execute(LoginInput {
             identity_type: payload.identity_type,
             identifier: payload.identifier,
@@ -146,7 +145,7 @@ pub async fn refresh(
     })?;
 
     let output = module
-        .refresh_token
+        .refresh_token()
         .execute(RefreshTokenInput { refresh_token })
         .await
         .map_err(|error| map_auth_error(error, context.request_id.clone()))?;
@@ -188,7 +187,7 @@ pub async fn logout(
 ) -> Result<(StatusCode, HeaderMap), AppError> {
     if let Some(refresh_token) = extract_cookie(&headers, "refresh_token") {
         module
-            .logout
+            .logout()
             .execute(LogoutInput { refresh_token })
             .await
             .map_err(|error| map_auth_error(error, context.request_id.clone()))?;
@@ -220,11 +219,11 @@ pub async fn logout(
 pub async fn me(
     Extension(module): Extension<Arc<IdentityModule>>,
     context: RequestContext,
-    user: AuthenticatedUser,
+    subject: AuthenticatedSubject,
 ) -> Result<Json<AuthMeResponse>, AppError> {
     let read_model = module
-        .user_queries
-        .get_by_id(&UserId::new(&user.user_id))
+        .user_queries()
+        .get_by_id(&subject.subject_id)
         .await
         .map_err(|error| map_auth_error(error, context.request_id.clone()))?
         .ok_or_else(|| {
@@ -333,6 +332,7 @@ mod tests {
     use crate::{
         app::AppState,
         readiness::{DependencyChecks, ReadinessProbe},
+        testing::identity::{FakeIdentityStore, FakeIdentityUnitOfWorkFactory},
     };
     use async_trait::async_trait;
     use axum::{
@@ -342,55 +342,24 @@ mod tests {
         response::Response,
     };
     use ordering_food_identity_application::{
-        AccessTokenClaims, ApplicationError, Clock, CredentialRepository, DisableUserInput,
-        IdGenerator, PasswordHasher, RefreshTokenStore, StoredCredential, TokenPair, TokenService,
-        TransactionContext, TransactionManager, UserIdentityReadModel, UserProfileReadModel,
-        UserReadModel, UserReadRepository, UserRepository,
+        AccessTokenClaims, ApplicationError, Clock, DisableUserInput, IdGenerator, PasswordHasher,
+        RefreshTokenStore, StoredCredential, TokenPair, TokenService,
     };
     use ordering_food_identity_domain::{
         IdentityType, NormalizedIdentifier, User, UserId, UserIdentity, UserProfile, UserStatus,
     };
-    use ordering_food_shared_kernel::{Identifier, Timestamp};
+    use ordering_food_identity_published::{
+        AccessTokenVerifier, AuthenticatedSubjectRef, IdentityCollaborationError,
+    };
+    use ordering_food_shared_kernel::Timestamp;
     use serde_json::Value;
     use std::{
-        any::Any,
         collections::HashMap,
         sync::{Arc, Mutex},
     };
     use time::macros::datetime;
     use tower::ServiceExt;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-
-    #[derive(Default)]
-    struct FakeTransactionContext;
-
-    impl TransactionContext for FakeTransactionContext {
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-
-        fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-            self
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeTransactionManager;
-
-    #[async_trait]
-    impl TransactionManager for FakeTransactionManager {
-        async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
-            Ok(Box::new(FakeTransactionContext))
-        }
-
-        async fn commit(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-            Ok(())
-        }
-
-        async fn rollback(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-            Ok(())
-        }
-    }
 
     struct FakeClock {
         now: Timestamp,
@@ -407,159 +376,6 @@ mod tests {
     impl IdGenerator for FakeIdGenerator {
         fn next_user_id(&self) -> UserId {
             UserId::new("generated-user")
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeRepository {
-        users: Mutex<HashMap<String, User>>,
-    }
-
-    impl FakeRepository {
-        fn seed(&self, user: User) {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user);
-        }
-    }
-
-    #[async_trait]
-    impl UserRepository for FakeRepository {
-        async fn find_by_id(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user_id: &UserId,
-        ) -> Result<Option<User>, ApplicationError> {
-            Ok(self.users.lock().unwrap().get(user_id.as_str()).cloned())
-        }
-
-        async fn find_by_identity(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            identity_type: &IdentityType,
-            identifier: &NormalizedIdentifier,
-        ) -> Result<Option<User>, ApplicationError> {
-            Ok(self
-                .users
-                .lock()
-                .unwrap()
-                .values()
-                .find(|user| {
-                    user.identities().iter().any(|identity| {
-                        identity.identity_type() == identity_type
-                            && identity.identifier_normalized() == identifier
-                    })
-                })
-                .cloned())
-        }
-
-        async fn insert(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user: &User,
-        ) -> Result<(), ApplicationError> {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user.clone());
-            Ok(())
-        }
-
-        async fn update(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user: &User,
-        ) -> Result<(), ApplicationError> {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user.clone());
-            Ok(())
-        }
-    }
-
-    #[async_trait]
-    impl UserReadRepository for FakeRepository {
-        async fn get_by_id(
-            &self,
-            user_id: &UserId,
-        ) -> Result<Option<UserReadModel>, ApplicationError> {
-            let users = self.users.lock().unwrap();
-            Ok(users.get(user_id.as_str()).map(|user| UserReadModel {
-                user_id: user.id().as_str().to_string(),
-                status: user.status().as_str().to_string(),
-                profile: UserProfileReadModel {
-                    display_name: user.profile().display_name().to_string(),
-                    given_name: user.profile().given_name().map(ToOwned::to_owned),
-                    family_name: user.profile().family_name().map(ToOwned::to_owned),
-                    avatar_url: user.profile().avatar_url().map(ToOwned::to_owned),
-                },
-                identities: user
-                    .identities()
-                    .iter()
-                    .map(|identity| UserIdentityReadModel {
-                        identity_type: identity.identity_type().as_str().to_string(),
-                        identifier_normalized: identity
-                            .identifier_normalized()
-                            .as_str()
-                            .to_string(),
-                        bound_at: identity.bound_at(),
-                    })
-                    .collect(),
-                created_at: user.created_at(),
-                updated_at: user.updated_at(),
-                deleted_at: user.deleted_at(),
-            }))
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeCredentialRepository {
-        credentials: Mutex<HashMap<String, StoredCredential>>,
-    }
-
-    impl FakeCredentialRepository {
-        fn seed(&self, credential: StoredCredential) {
-            self.credentials
-                .lock()
-                .unwrap()
-                .insert(credential.user_id.clone(), credential);
-        }
-    }
-
-    #[async_trait]
-    impl CredentialRepository for FakeCredentialRepository {
-        async fn find_by_user_id(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user_id: &UserId,
-        ) -> Result<Option<StoredCredential>, ApplicationError> {
-            Ok(self
-                .credentials
-                .lock()
-                .unwrap()
-                .get(user_id.as_str())
-                .cloned())
-        }
-
-        async fn upsert(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user_id: &UserId,
-            password_hash: &str,
-            now: Timestamp,
-        ) -> Result<(), ApplicationError> {
-            self.credentials.lock().unwrap().insert(
-                user_id.as_str().to_string(),
-                StoredCredential {
-                    user_id: user_id.as_str().to_string(),
-                    password_hash: password_hash.to_string(),
-                    created_at: now,
-                    updated_at: now,
-                },
-            );
-            Ok(())
         }
     }
 
@@ -611,6 +427,25 @@ mod tests {
                 .ok_or_else(|| ApplicationError::unauthorized("invalid or expired access token"))?;
 
             Ok(AccessTokenClaims { user_id, exp: 900 })
+        }
+    }
+
+    impl AccessTokenVerifier for FakeTokenService {
+        fn verify_access_token(
+            &self,
+            token: &str,
+        ) -> Result<AuthenticatedSubjectRef, IdentityCollaborationError> {
+            let user_id = self
+                .issued_tokens
+                .lock()
+                .unwrap()
+                .get(token)
+                .cloned()
+                .ok_or_else(|| {
+                    IdentityCollaborationError::new("invalid or expired access token")
+                })?;
+
+            Ok(AuthenticatedSubjectRef::new(user_id))
         }
     }
 
@@ -696,26 +531,23 @@ mod tests {
     }
 
     fn build_test_app(
-        repository: Arc<FakeRepository>,
-        credential_repository: Arc<FakeCredentialRepository>,
+        store: Arc<FakeIdentityStore>,
         token_service: Arc<FakeTokenService>,
         refresh_token_store: Arc<FakeRefreshTokenStore>,
     ) -> (Router, Arc<IdentityModule>) {
         let module = Arc::new(IdentityModule::new(
-            repository.clone(),
-            repository,
-            Arc::new(FakeTransactionManager),
+            store.clone(),
+            Arc::new(FakeIdentityUnitOfWorkFactory::new(store)),
             Arc::new(FakeClock {
                 now: datetime!(2026-03-10 08:00 UTC),
             }),
             Arc::new(FakeIdGenerator),
-            credential_repository,
             Arc::new(FakePasswordHasher),
             token_service.clone(),
             refresh_token_store,
         ));
         let request_id_header = HeaderName::from_static("x-request-id");
-        let token_service_extension: Arc<dyn TokenService> = token_service;
+        let token_service_extension: Arc<dyn AccessTokenVerifier> = token_service;
 
         let app = Router::new()
             .nest(
@@ -762,18 +594,16 @@ mod tests {
 
     #[tokio::test]
     async fn login_sets_auth_cookies_and_returns_body() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 06:00 UTC),
             updated_at: datetime!(2026-03-10 06:00 UTC),
         });
         let (app, _) = build_test_app(
-            repository,
-            credential_repository,
+            store,
             Arc::new(FakeTokenService::default()),
             Arc::new(FakeRefreshTokenStore::default()),
         );
@@ -802,18 +632,16 @@ mod tests {
 
     #[tokio::test]
     async fn me_returns_current_user_for_valid_login_cookie() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 06:00 UTC),
             updated_at: datetime!(2026-03-10 06:00 UTC),
         });
         let (app, _) = build_test_app(
-            repository,
-            credential_repository,
+            store,
             Arc::new(FakeTokenService::default()),
             Arc::new(FakeRefreshTokenStore::default()),
         );
@@ -857,10 +685,9 @@ mod tests {
 
     #[tokio::test]
     async fn logout_revokes_refresh_token_and_clears_cookies() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 06:00 UTC),
@@ -868,8 +695,7 @@ mod tests {
         });
         let refresh_token_store = Arc::new(FakeRefreshTokenStore::default());
         let (app, _) = build_test_app(
-            repository,
-            credential_repository,
+            store,
             Arc::new(FakeTokenService::default()),
             refresh_token_store,
         );
@@ -942,18 +768,16 @@ mod tests {
 
     #[tokio::test]
     async fn refresh_rejects_user_after_disable() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 06:00 UTC),
             updated_at: datetime!(2026-03-10 06:00 UTC),
         });
         let (app, module) = build_test_app(
-            repository,
-            credential_repository,
+            store,
             Arc::new(FakeTokenService::default()),
             Arc::new(FakeRefreshTokenStore::default()),
         );
@@ -976,7 +800,7 @@ mod tests {
         let cookie = cookie_header(&login_response);
 
         module
-            .disable_user
+            .disable_user()
             .execute(DisableUserInput {
                 user_id: "user-1".to_string(),
             })
@@ -1002,18 +826,16 @@ mod tests {
 
     #[tokio::test]
     async fn refresh_rotates_cookies_on_success() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 06:00 UTC),
             updated_at: datetime!(2026-03-10 06:00 UTC),
         });
         let (app, _) = build_test_app(
-            repository,
-            credential_repository,
+            store,
             Arc::new(FakeTokenService::default()),
             Arc::new(FakeRefreshTokenStore::default()),
         );
@@ -1061,8 +883,7 @@ mod tests {
     #[tokio::test]
     async fn me_rejects_invalid_access_token() {
         let (app, _) = build_test_app(
-            Arc::new(FakeRepository::default()),
-            Arc::new(FakeCredentialRepository::default()),
+            Arc::new(FakeIdentityStore::default()),
             Arc::new(FakeTokenService::default()),
             Arc::new(FakeRefreshTokenStore::default()),
         );

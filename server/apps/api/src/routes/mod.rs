@@ -1,9 +1,10 @@
 pub mod api;
 pub mod auth;
+pub mod catalog;
+pub mod fulfillment;
 pub mod health;
 pub mod identity;
-pub mod menu;
-pub mod orders;
+pub mod ordering;
 
 use crate::{
     app::AppState,
@@ -13,6 +14,7 @@ use crate::{
     readiness::DependencyChecks,
 };
 use axum::{Router, extract::DefaultBodyLimit};
+use std::collections::BTreeMap;
 use utoipa::{OpenApi, openapi::OpenApi as OpenApiDocument};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -58,8 +60,17 @@ pub fn router(
         .nest(API_PREFIX, api_router)
         .fallback(http::not_found);
 
+    let mut grouped_mounts = BTreeMap::<&'static str, Router<AppState>>::new();
     for route_mount in route_mounts {
-        router = router.nest(route_mount.path, route_mount.router);
+        if let Some(existing) = grouped_mounts.remove(route_mount.path) {
+            grouped_mounts.insert(route_mount.path, existing.merge(route_mount.router));
+        } else {
+            grouped_mounts.insert(route_mount.path, route_mount.router);
+        }
+    }
+
+    for (path, nested_router) in grouped_mounts {
+        router = router.nest(path, nested_router);
     }
 
     let mut openapi = ApiDoc::openapi();

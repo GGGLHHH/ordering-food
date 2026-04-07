@@ -1,0 +1,18 @@
+[package]
+name = "ordering-food-catalog-application"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ordering-food-catalog-domain = { path = "../catalog-domain" }
+ordering-food-organization-published = { path = "../organization-published" }
+ordering-food-platform-kernel = { path = "../platform-kernel" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+time.workspace = true

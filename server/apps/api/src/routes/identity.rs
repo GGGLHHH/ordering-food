@@ -14,8 +14,6 @@ use ordering_food_identity_application::{
     DisableUserInput, IdentityModule, SoftDeleteUserInput, UpdateUserProfileInput,
     UserIdentityReadModel, UserProfileReadModel, UserReadModel,
 };
-use ordering_food_identity_domain::{User, UserId};
-use ordering_food_shared_kernel::Identifier;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -186,7 +184,7 @@ pub async fn create_user(
     ApiJson(payload): ApiJson<CreateIdentityUserRequest>,
 ) -> Result<(StatusCode, Json<IdentityUserResponse>), AppError> {
     let user = module
-        .create_user
+        .create_user()
         .execute(CreateUserInput {
             display_name: payload.display_name,
             given_name: payload.given_name,
@@ -205,7 +203,7 @@ pub async fn create_user(
         .await
         .map_err(|error| map_application_error(error, context.request_id.clone()))?;
 
-    let response = map_domain_user_to_response(user)
+    let response = map_read_model_to_response(user)
         .map_err(|error| error.with_request_id(context.request_id.clone()))?;
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -229,8 +227,8 @@ pub async fn get_user(
     ApiPath(path): ApiPath<IdentityUserPath>,
 ) -> Result<Json<IdentityUserResponse>, AppError> {
     let user = module
-        .user_queries
-        .get_by_id(&UserId::new(path.user_id))
+        .user_queries()
+        .get_by_id(&path.user_id)
         .await
         .map_err(|error| map_application_error(error, context.request_id.clone()))?
         .ok_or_else(|| {
@@ -266,7 +264,7 @@ pub async fn update_user_profile(
     ApiJson(payload): ApiJson<UpdateIdentityUserProfileRequest>,
 ) -> Result<Json<IdentityUserResponse>, AppError> {
     module
-        .update_user_profile
+        .update_user_profile()
         .execute(UpdateUserProfileInput {
             user_id: path.user_id.clone(),
             display_name: payload.display_name,
@@ -305,7 +303,7 @@ pub async fn bind_user_identity(
     ApiJson(payload): ApiJson<BindIdentityUserIdentityRequest>,
 ) -> Result<Json<IdentityUserResponse>, AppError> {
     module
-        .bind_user_identity
+        .bind_user_identity()
         .execute(BindUserIdentityInput {
             user_id: path.user_id.clone(),
             identity_type: payload.identity_type,
@@ -337,7 +335,7 @@ pub async fn disable_user(
     ApiPath(path): ApiPath<IdentityUserPath>,
 ) -> Result<Json<IdentityUserResponse>, AppError> {
     module
-        .disable_user
+        .disable_user()
         .execute(DisableUserInput {
             user_id: path.user_id.clone(),
         })
@@ -367,7 +365,7 @@ pub async fn soft_delete_user(
     ApiPath(path): ApiPath<IdentityUserPath>,
 ) -> Result<Json<IdentityUserResponse>, AppError> {
     module
-        .soft_delete_user
+        .soft_delete_user()
         .execute(SoftDeleteUserInput {
             user_id: path.user_id.clone(),
         })
@@ -404,8 +402,8 @@ async fn load_user_response(
     request_id: Option<String>,
 ) -> Result<IdentityUserResponse, AppError> {
     let user = module
-        .user_queries
-        .get_by_id(&UserId::new(user_id.to_string()))
+        .user_queries()
+        .get_by_id(user_id)
         .await
         .map_err(|error| map_application_error(error, request_id.clone()))?
         .ok_or_else(|| {
@@ -415,33 +413,7 @@ async fn load_user_response(
     map_read_model_to_response(user).map_err(|error| error.with_request_id(request_id))
 }
 
-fn map_domain_user_to_response(user: User) -> Result<IdentityUserResponse, AppError> {
-    Ok(IdentityUserResponse {
-        user_id: user.id().as_str().to_string(),
-        status: user.status().as_str().to_string(),
-        profile: IdentityUserProfileResponse {
-            display_name: user.profile().display_name().to_string(),
-            given_name: user.profile().given_name().map(ToOwned::to_owned),
-            family_name: user.profile().family_name().map(ToOwned::to_owned),
-            avatar_url: user.profile().avatar_url().map(ToOwned::to_owned),
-        },
-        identities: user
-            .identities()
-            .iter()
-            .map(|identity| {
-                Ok(IdentityUserIdentityResponse {
-                    identity_type: identity.identity_type().as_str().to_string(),
-                    identifier_normalized: identity.identifier_normalized().as_str().to_string(),
-                    bound_at: format_timestamp(identity.bound_at())?,
-                })
-            })
-            .collect::<Result<Vec<_>, AppError>>()?,
-        created_at: format_timestamp(user.created_at())?,
-        updated_at: format_timestamp(user.updated_at())?,
-        deleted_at: user.deleted_at().map(format_timestamp).transpose()?,
-    })
-}
-
+#[allow(clippy::result_large_err)]
 fn map_read_model_to_response(user: UserReadModel) -> Result<IdentityUserResponse, AppError> {
     Ok(IdentityUserResponse {
         user_id: user.user_id,
@@ -467,6 +439,7 @@ fn map_profile_read_model(profile: UserProfileReadModel) -> IdentityUserProfileR
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn map_identity_read_model(
     identity: UserIdentityReadModel,
 ) -> Result<IdentityUserIdentityResponse, AppError> {
@@ -477,6 +450,7 @@ fn map_identity_read_model(
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn format_timestamp(timestamp: OffsetDateTime) -> Result<String, AppError> {
     timestamp
         .format(&Rfc3339)
@@ -489,6 +463,7 @@ mod tests {
     use crate::{
         app::AppState,
         readiness::{DependencyChecks, ReadinessProbe},
+        testing::identity::{FakeIdentityStore, FakeIdentityUnitOfWorkFactory},
     };
     use async_trait::async_trait;
     use axum::{
@@ -498,54 +473,18 @@ mod tests {
         response::Response,
     };
     use ordering_food_identity_application::{
-        AccessTokenClaims, ApplicationError, Clock, CredentialRepository, IdGenerator,
-        PasswordHasher, RefreshTokenStore, StoredCredential, TokenPair, TokenService,
-        TransactionContext, TransactionManager, UserReadRepository, UserRepository,
+        AccessTokenClaims, ApplicationError, Clock, IdGenerator, PasswordHasher, RefreshTokenStore,
+        TokenPair, TokenService,
     };
     use ordering_food_identity_domain::{
         IdentityType, NormalizedIdentifier, User, UserIdentity, UserProfile, UserStatus,
     };
     use ordering_food_shared_kernel::Timestamp;
     use serde_json::Value;
-    use std::{
-        any::Any,
-        collections::HashMap,
-        sync::{Arc, Mutex},
-    };
+    use std::sync::Arc;
     use time::macros::datetime;
     use tower::ServiceExt;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-
-    #[derive(Default)]
-    struct FakeTransactionContext;
-
-    impl TransactionContext for FakeTransactionContext {
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-
-        fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-            self
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeTransactionManager;
-
-    #[async_trait]
-    impl TransactionManager for FakeTransactionManager {
-        async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
-            Ok(Box::new(FakeTransactionContext))
-        }
-
-        async fn commit(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-            Ok(())
-        }
-
-        async fn rollback(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-            Ok(())
-        }
-    }
 
     struct FakeClock {
         now: Timestamp,
@@ -564,115 +503,6 @@ mod tests {
     impl IdGenerator for FakeIdGenerator {
         fn next_user_id(&self) -> ordering_food_identity_domain::UserId {
             self.next_id.clone()
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeRepository {
-        users: Mutex<HashMap<String, User>>,
-    }
-
-    impl FakeRepository {
-        fn seed(&self, user: User) {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user);
-        }
-    }
-
-    #[async_trait]
-    impl UserRepository for FakeRepository {
-        async fn find_by_id(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user_id: &ordering_food_identity_domain::UserId,
-        ) -> Result<Option<User>, ApplicationError> {
-            Ok(self.users.lock().unwrap().get(user_id.as_str()).cloned())
-        }
-
-        async fn find_by_identity(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            identity_type: &IdentityType,
-            identifier: &NormalizedIdentifier,
-        ) -> Result<Option<User>, ApplicationError> {
-            Ok(self
-                .users
-                .lock()
-                .unwrap()
-                .values()
-                .find(|user| {
-                    user.identities().iter().any(|identity| {
-                        identity.identity_type() == identity_type
-                            && identity.identifier_normalized() == identifier
-                    })
-                })
-                .cloned())
-        }
-
-        async fn insert(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user: &User,
-        ) -> Result<(), ApplicationError> {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user.clone());
-            Ok(())
-        }
-
-        async fn update(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user: &User,
-        ) -> Result<(), ApplicationError> {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user.clone());
-            Ok(())
-        }
-    }
-
-    #[async_trait]
-    impl UserReadRepository for FakeRepository {
-        async fn get_by_id(
-            &self,
-            user_id: &ordering_food_identity_domain::UserId,
-        ) -> Result<Option<UserReadModel>, ApplicationError> {
-            Ok(self
-                .users
-                .lock()
-                .unwrap()
-                .get(user_id.as_str())
-                .cloned()
-                .map(|user| UserReadModel {
-                    user_id: user.id().as_str().to_string(),
-                    status: user.status().as_str().to_string(),
-                    profile: UserProfileReadModel {
-                        display_name: user.profile().display_name().to_string(),
-                        given_name: user.profile().given_name().map(ToOwned::to_owned),
-                        family_name: user.profile().family_name().map(ToOwned::to_owned),
-                        avatar_url: user.profile().avatar_url().map(ToOwned::to_owned),
-                    },
-                    identities: user
-                        .identities()
-                        .iter()
-                        .map(|identity| UserIdentityReadModel {
-                            identity_type: identity.identity_type().as_str().to_string(),
-                            identifier_normalized: identity
-                                .identifier_normalized()
-                                .as_str()
-                                .to_string(),
-                            bound_at: identity.bound_at(),
-                        })
-                        .collect(),
-                    created_at: user.created_at(),
-                    updated_at: user.updated_at(),
-                    deleted_at: user.deleted_at(),
-                }))
         }
     }
 
@@ -695,29 +525,6 @@ mod tests {
         }
         async fn verify(&self, _raw: &str, _hash: &str) -> Result<bool, ApplicationError> {
             Ok(true)
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeCredentialRepository;
-
-    #[async_trait]
-    impl CredentialRepository for FakeCredentialRepository {
-        async fn find_by_user_id(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            _user_id: &ordering_food_identity_domain::UserId,
-        ) -> Result<Option<StoredCredential>, ApplicationError> {
-            Ok(None)
-        }
-        async fn upsert(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            _user_id: &ordering_food_identity_domain::UserId,
-            _hash: &str,
-            _now: ordering_food_shared_kernel::Timestamp,
-        ) -> Result<(), ApplicationError> {
-            Ok(())
         }
     }
 
@@ -762,18 +569,16 @@ mod tests {
         }
     }
 
-    fn build_test_app(repository: Arc<FakeRepository>) -> Router {
+    fn build_test_app(store: Arc<FakeIdentityStore>) -> Router {
         let module = Arc::new(IdentityModule::new(
-            repository.clone(),
-            repository,
-            Arc::new(FakeTransactionManager),
+            store.clone(),
+            Arc::new(FakeIdentityUnitOfWorkFactory::new(store)),
             Arc::new(FakeClock {
                 now: datetime!(2026-03-10 08:00 UTC),
             }),
             Arc::new(FakeIdGenerator {
                 next_id: ordering_food_identity_domain::UserId::new("user-123"),
             }),
-            Arc::new(FakeCredentialRepository),
             Arc::new(FakePasswordHasher),
             Arc::new(FakeTokenService),
             Arc::new(FakeRefreshTokenStore),
@@ -795,7 +600,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_user_returns_created_identity_payload() {
-        let app = build_test_app(Arc::new(FakeRepository::default()));
+        let app = build_test_app(Arc::new(FakeIdentityStore::default()));
 
         let response = app
             .oneshot(
@@ -827,8 +632,8 @@ mod tests {
 
     #[tokio::test]
     async fn get_user_returns_read_model_payload() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(
             User::rehydrate(
                 ordering_food_identity_domain::UserId::new("user-7"),
                 UserStatus::Disabled,
@@ -844,7 +649,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -871,13 +676,13 @@ mod tests {
 
     #[tokio::test]
     async fn update_user_profile_returns_updated_payload() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(User::create(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(User::create(
             ordering_food_identity_domain::UserId::new("user-profile"),
             UserProfile::new("Alice", None, None, None).unwrap(),
             datetime!(2026-03-10 06:00 UTC),
         ));
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -904,13 +709,13 @@ mod tests {
 
     #[tokio::test]
     async fn bind_user_identity_returns_updated_payload() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(User::create(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(User::create(
             ordering_food_identity_domain::UserId::new("user-bind"),
             UserProfile::new("Alice", None, None, None).unwrap(),
             datetime!(2026-03-10 06:00 UTC),
         ));
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -940,13 +745,13 @@ mod tests {
 
     #[tokio::test]
     async fn disable_user_returns_disabled_payload() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(User::create(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(User::create(
             ordering_food_identity_domain::UserId::new("user-disable"),
             UserProfile::new("Alice", None, None, None).unwrap(),
             datetime!(2026-03-10 06:00 UTC),
         ));
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -969,8 +774,8 @@ mod tests {
 
     #[tokio::test]
     async fn disable_user_returns_conflict_envelope_when_user_is_already_disabled() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(
             User::rehydrate(
                 ordering_food_identity_domain::UserId::new("user-disable"),
                 UserStatus::Disabled,
@@ -982,7 +787,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -1004,13 +809,13 @@ mod tests {
 
     #[tokio::test]
     async fn soft_delete_user_returns_deleted_payload() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(User::create(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(User::create(
             ordering_food_identity_domain::UserId::new("user-soft-delete"),
             UserProfile::new("Alice", None, None, None).unwrap(),
             datetime!(2026-03-10 06:00 UTC),
         ));
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -1034,8 +839,8 @@ mod tests {
 
     #[tokio::test]
     async fn soft_delete_user_conflict_returns_conflict_envelope() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(
             User::rehydrate(
                 ordering_food_identity_domain::UserId::new("user-soft-deleted"),
                 UserStatus::Disabled,
@@ -1047,7 +852,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -1071,8 +876,8 @@ mod tests {
 
     #[tokio::test]
     async fn create_user_conflict_returns_conflict_envelope() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(
             User::rehydrate(
                 ordering_food_identity_domain::UserId::new("user-existing"),
                 UserStatus::Active,
@@ -1088,7 +893,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let app = build_test_app(repository);
+        let app = build_test_app(store);
 
         let response = app
             .oneshot(
@@ -1114,7 +919,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_user_not_found_returns_not_found_envelope() {
-        let app = build_test_app(Arc::new(FakeRepository::default()));
+        let app = build_test_app(Arc::new(FakeIdentityStore::default()));
 
         let response = app
             .oneshot(

@@ -1199,6 +1199,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordering-food-access-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-access-domain",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-access-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+]
+
+[[package]]
+name = "ordering-food-access-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-access-application",
+ "ordering-food-access-domain",
+ "ordering-food-database-infrastructure-sqlx",
+ "sqlx",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-access-integration"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-access-application",
+ "ordering-food-access-infrastructure-sqlx",
+ "ordering-food-access-published",
+ "ordering-food-identity-published",
+ "ordering-food-organization-published",
+ "sqlx",
+]
+
+[[package]]
+name = "ordering-food-access-published"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "thiserror",
+]
+
+[[package]]
 name = "ordering-food-api"
 version = "0.1.0"
 dependencies = [
@@ -1207,21 +1258,28 @@ dependencies = [
  "axum",
  "config",
  "dotenvy",
- "ordering-food-authz-application",
- "ordering-food-authz-domain",
- "ordering-food-authz-infrastructure-sqlx",
+ "ordering-food-access-application",
+ "ordering-food-access-domain",
+ "ordering-food-access-integration",
+ "ordering-food-access-published",
  "ordering-food-bootstrap-core",
+ "ordering-food-catalog-application",
+ "ordering-food-catalog-integration",
  "ordering-food-database-infrastructure-sqlx",
+ "ordering-food-fulfillment-application",
+ "ordering-food-fulfillment-domain",
+ "ordering-food-fulfillment-integration",
  "ordering-food-identity-application",
  "ordering-food-identity-domain",
- "ordering-food-identity-infrastructure-auth",
- "ordering-food-identity-infrastructure-sqlx",
- "ordering-food-menu-application",
- "ordering-food-menu-domain",
- "ordering-food-menu-infrastructure-sqlx",
- "ordering-food-order-application",
- "ordering-food-order-domain",
- "ordering-food-order-infrastructure-sqlx",
+ "ordering-food-identity-integration",
+ "ordering-food-identity-published",
+ "ordering-food-ordering-application",
+ "ordering-food-ordering-domain",
+ "ordering-food-ordering-integration",
+ "ordering-food-organization-application",
+ "ordering-food-organization-integration",
+ "ordering-food-organization-published",
+ "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "redis",
  "serde",
@@ -1244,37 +1302,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordering-food-authz-application"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "ordering-food-authz-domain",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "ordering-food-authz-domain"
-version = "0.1.0"
-dependencies = [
- "ordering-food-shared-kernel",
- "thiserror",
-]
-
-[[package]]
-name = "ordering-food-authz-infrastructure-sqlx"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "ordering-food-authz-application",
- "ordering-food-authz-domain",
- "ordering-food-database-infrastructure-sqlx",
- "sqlx",
- "time",
- "uuid",
-]
-
-[[package]]
 name = "ordering-food-bootstrap-core"
 version = "0.1.0"
 dependencies = [
@@ -1282,6 +1309,61 @@ dependencies = [
  "thiserror",
  "tokio",
 ]
+
+[[package]]
+name = "ordering-food-catalog-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-catalog-domain",
+ "ordering-food-organization-published",
+ "ordering-food-platform-kernel",
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-catalog-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-catalog-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-catalog-application",
+ "ordering-food-catalog-domain",
+ "ordering-food-database-infrastructure-sqlx",
+ "ordering-food-shared-kernel",
+ "sqlx",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-catalog-integration"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-catalog-application",
+ "ordering-food-catalog-domain",
+ "ordering-food-catalog-infrastructure-sqlx",
+ "ordering-food-catalog-published",
+ "ordering-food-organization-published",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-catalog-published"
+version = "0.1.0"
 
 [[package]]
 name = "ordering-food-database-infrastructure-sqlx"
@@ -1293,11 +1375,72 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordering-food-fulfillment-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-fulfillment-domain",
+ "ordering-food-ordering-published",
+ "ordering-food-platform-kernel",
+ "ordering-food-shared-kernel",
+ "serde_json",
+ "thiserror",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-fulfillment-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "statig",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-fulfillment-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-database-infrastructure-sqlx",
+ "ordering-food-fulfillment-application",
+ "ordering-food-fulfillment-domain",
+ "ordering-food-shared-kernel",
+ "serde_json",
+ "sqlx",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-fulfillment-integration"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-database-infrastructure-sqlx",
+ "ordering-food-fulfillment-application",
+ "ordering-food-fulfillment-infrastructure-sqlx",
+ "ordering-food-ordering-published",
+ "ordering-food-platform-kernel",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-fulfillment-published"
+version = "0.1.0"
+
+[[package]]
 name = "ordering-food-identity-application"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "ordering-food-identity-domain",
+ "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "thiserror",
  "time",
@@ -1321,6 +1464,7 @@ dependencies = [
  "async-trait",
  "jsonwebtoken",
  "ordering-food-identity-application",
+ "ordering-food-identity-published",
  "ordering-food-shared-kernel",
  "redis",
  "serde",
@@ -1343,46 +1487,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordering-food-menu-application"
+name = "ordering-food-identity-integration"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "ordering-food-menu-domain",
- "ordering-food-shared-kernel",
- "thiserror",
- "time",
- "tokio",
-]
-
-[[package]]
-name = "ordering-food-menu-domain"
-version = "0.1.0"
-dependencies = [
- "ordering-food-shared-kernel",
- "thiserror",
- "time",
-]
-
-[[package]]
-name = "ordering-food-menu-infrastructure-sqlx"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "ordering-food-database-infrastructure-sqlx",
- "ordering-food-menu-application",
- "ordering-food-menu-domain",
- "ordering-food-shared-kernel",
+ "ordering-food-identity-application",
+ "ordering-food-identity-domain",
+ "ordering-food-identity-infrastructure-auth",
+ "ordering-food-identity-infrastructure-sqlx",
+ "ordering-food-identity-published",
+ "ordering-food-platform-kernel",
+ "redis",
  "sqlx",
- "tokio",
  "uuid",
 ]
 
 [[package]]
-name = "ordering-food-order-application"
+name = "ordering-food-identity-published"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "ordering-food-order-domain",
+ "thiserror",
+]
+
+[[package]]
+name = "ordering-food-ordering-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-ordering-domain",
+ "ordering-food-ordering-published",
+ "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "thiserror",
  "time",
@@ -1390,7 +1525,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordering-food-order-domain"
+name = "ordering-food-ordering-domain"
 version = "0.1.0"
 dependencies = [
  "ordering-food-shared-kernel",
@@ -1400,16 +1535,109 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordering-food-order-infrastructure-sqlx"
+name = "ordering-food-ordering-infrastructure-sqlx"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "ordering-food-database-infrastructure-sqlx",
- "ordering-food-order-application",
- "ordering-food-order-domain",
+ "ordering-food-ordering-application",
+ "ordering-food-ordering-domain",
+ "ordering-food-shared-kernel",
+ "serde_json",
+ "sqlx",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-ordering-integration"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-ordering-application",
+ "ordering-food-ordering-domain",
+ "ordering-food-ordering-infrastructure-sqlx",
+ "ordering-food-platform-kernel",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-ordering-published"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "serde",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-organization-application"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-organization-domain",
+ "ordering-food-organization-published",
+ "ordering-food-platform-kernel",
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "ordering-food-organization-domain"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-organization-infrastructure-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-database-infrastructure-sqlx",
+ "ordering-food-organization-application",
+ "ordering-food-organization-domain",
+ "ordering-food-organization-published",
  "ordering-food-shared-kernel",
  "sqlx",
  "time",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-organization-integration"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-organization-application",
+ "ordering-food-organization-domain",
+ "ordering-food-organization-infrastructure-sqlx",
+ "ordering-food-organization-published",
+ "ordering-food-platform-kernel",
+ "sqlx",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-organization-published"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ordering-food-shared-kernel",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "ordering-food-platform-kernel"
+version = "0.1.0"
+dependencies = [
+ "ordering-food-shared-kernel",
  "uuid",
 ]
 

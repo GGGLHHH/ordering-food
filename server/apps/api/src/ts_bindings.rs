@@ -7,16 +7,19 @@ use crate::{
         ExampleSearchQuery, ExampleSearchResponse,
     },
     routes::auth::{AuthMeResponse, AuthResponse, LoginRequest},
+    routes::catalog::{
+        CatalogCategoriesResponse, CatalogCategoryResponse, CatalogItemPath, CatalogItemResponse,
+        CatalogItemsQuery, CatalogItemsResponse, CatalogStoreCatalogResponse,
+    },
+    routes::fulfillment::{
+        FulfillmentOrderItemResponse, FulfillmentOrderPath, FulfillmentOrderResponse,
+    },
     routes::identity::{
         BindIdentityUserIdentityRequest, CreateIdentityUserIdentityRequest,
         CreateIdentityUserRequest, IdentityUserIdentityResponse, IdentityUserPath,
         IdentityUserProfileResponse, IdentityUserResponse, UpdateIdentityUserProfileRequest,
     },
-    routes::menu::{
-        MenuCategoriesResponse, MenuCategoryResponse, MenuItemPath, MenuItemResponse,
-        MenuItemsQuery, MenuItemsResponse, MenuStoreResponse,
-    },
-    routes::orders::{
+    routes::ordering::{
         OrderItemResponse, OrderListItemResponse, OrderListResponse, OrderPath, OrderResponse,
         PlaceOrderItemRequest, PlaceOrderRequest,
     },
@@ -61,6 +64,7 @@ pub fn export_bindings_to(output_dir: &Path) -> anyhow::Result<()> {
         .with_large_int("number");
 
     export_contract_types(&config)?;
+    write_legacy_contract_aliases(output_dir)?;
     write_index_file(output_dir)?;
 
     Ok(())
@@ -88,13 +92,13 @@ fn export_contract_types(config: &Config) -> Result<(), ts_rs::ExportError> {
     LoginRequest::export_all(config)?;
     AuthResponse::export_all(config)?;
     AuthMeResponse::export_all(config)?;
-    MenuStoreResponse::export_all(config)?;
-    MenuCategoryResponse::export_all(config)?;
-    MenuCategoriesResponse::export_all(config)?;
-    MenuItemsQuery::export_all(config)?;
-    MenuItemPath::export_all(config)?;
-    MenuItemResponse::export_all(config)?;
-    MenuItemsResponse::export_all(config)?;
+    CatalogStoreCatalogResponse::export_all(config)?;
+    CatalogCategoryResponse::export_all(config)?;
+    CatalogCategoriesResponse::export_all(config)?;
+    CatalogItemsQuery::export_all(config)?;
+    CatalogItemPath::export_all(config)?;
+    CatalogItemResponse::export_all(config)?;
+    CatalogItemsResponse::export_all(config)?;
     PlaceOrderItemRequest::export_all(config)?;
     PlaceOrderRequest::export_all(config)?;
     OrderPath::export_all(config)?;
@@ -102,6 +106,9 @@ fn export_contract_types(config: &Config) -> Result<(), ts_rs::ExportError> {
     OrderListItemResponse::export_all(config)?;
     OrderListResponse::export_all(config)?;
     OrderResponse::export_all(config)?;
+    FulfillmentOrderPath::export_all(config)?;
+    FulfillmentOrderItemResponse::export_all(config)?;
+    FulfillmentOrderResponse::export_all(config)?;
     Ok(())
 }
 
@@ -121,6 +128,30 @@ fn reset_output_dir(output_dir: &Path) -> anyhow::Result<()> {
             output_dir.display()
         )
     })
+}
+
+fn write_legacy_contract_aliases(output_dir: &Path) -> anyhow::Result<()> {
+    for (alias, target) in [
+        ("MenuStoreResponse", "CatalogStoreCatalogResponse"),
+        ("MenuCategoriesResponse", "CatalogCategoriesResponse"),
+        ("MenuCategoryResponse", "CatalogCategoryResponse"),
+        ("MenuItemsQuery", "CatalogItemsQuery"),
+        ("MenuItemsResponse", "CatalogItemsResponse"),
+        ("MenuItemResponse", "CatalogItemResponse"),
+        ("MenuItemPath", "CatalogItemPath"),
+    ] {
+        let contents = format!(
+            "import type {{ {target} }} from \"./{target}\";\n\nexport type {alias} = {target};\n"
+        );
+        fs::write(output_dir.join(format!("{alias}.ts")), contents).with_context(|| {
+            format!(
+                "failed to write legacy TS alias `{}`",
+                output_dir.join(format!("{alias}.ts")).display()
+            )
+        })?;
+    }
+
+    Ok(())
 }
 
 fn write_index_file(output_dir: &Path) -> anyhow::Result<()> {
@@ -217,14 +248,17 @@ mod tests {
             fs::read_to_string(temp_root.join("ExampleItemResponse.ts")).unwrap();
         let identity_user_response =
             fs::read_to_string(temp_root.join("IdentityUserResponse.ts")).unwrap();
-        let menu_store_response =
-            fs::read_to_string(temp_root.join("MenuStoreResponse.ts")).unwrap();
-        let menu_items_query = fs::read_to_string(temp_root.join("MenuItemsQuery.ts")).unwrap();
+        let catalog_store_response =
+            fs::read_to_string(temp_root.join("CatalogStoreCatalogResponse.ts")).unwrap();
+        let catalog_items_query =
+            fs::read_to_string(temp_root.join("CatalogItemsQuery.ts")).unwrap();
         let place_order_request =
             fs::read_to_string(temp_root.join("PlaceOrderRequest.ts")).unwrap();
         let order_list_response =
             fs::read_to_string(temp_root.join("OrderListResponse.ts")).unwrap();
         let order_response = fs::read_to_string(temp_root.join("OrderResponse.ts")).unwrap();
+        let fulfillment_order_response =
+            fs::read_to_string(temp_root.join("FulfillmentOrderResponse.ts")).unwrap();
         let update_identity_user_profile_request =
             fs::read_to_string(temp_root.join("UpdateIdentityUserProfileRequest.ts")).unwrap();
         let index = fs::read_to_string(temp_root.join("index.ts")).unwrap();
@@ -235,21 +269,24 @@ mod tests {
         assert!(ready_response.contains("checks: DependencyChecks"));
         assert!(example_item_response.contains("item_id: number"));
         assert!(identity_user_response.contains("deleted_at?: string"));
-        assert!(menu_store_response.contains("currency_code: string"));
-        assert!(menu_items_query.contains("category_slug?: string"));
+        assert!(catalog_store_response.contains("display_rule: string"));
+        assert!(catalog_items_query.contains("category_slug?: string"));
         assert!(place_order_request.contains("items: Array<PlaceOrderItemRequest>"));
         assert!(order_list_response.contains("orders: Array<OrderListItemResponse>"));
         assert!(order_response.contains("status: string"));
+        assert!(fulfillment_order_response.contains("workflow_status: string"));
+        assert!(fulfillment_order_response.contains("commercial_status: string"));
         assert!(update_identity_user_profile_request.contains("display_name: string"));
         assert!(index.contains("export * from \"./ErrorEnvelope\";"));
         assert!(index.contains("export * from \"./BindIdentityUserIdentityRequest\";"));
         assert!(index.contains("export * from \"./CreateIdentityUserRequest\";"));
         assert!(index.contains("export * from \"./IdentityUserResponse\";"));
-        assert!(index.contains("export * from \"./MenuStoreResponse\";"));
-        assert!(index.contains("export * from \"./MenuItemsQuery\";"));
+        assert!(index.contains("export * from \"./CatalogStoreCatalogResponse\";"));
+        assert!(index.contains("export * from \"./CatalogItemsQuery\";"));
         assert!(index.contains("export * from \"./PlaceOrderRequest\";"));
         assert!(index.contains("export * from \"./OrderListResponse\";"));
         assert!(index.contains("export * from \"./OrderResponse\";"));
+        assert!(index.contains("export * from \"./FulfillmentOrderResponse\";"));
         assert!(index.contains("export * from \"./UpdateIdentityUserProfileRequest\";"));
         assert!(index.contains("export * from \"./ReadyResponse\";"));
         assert!(index.contains("export * from \"./ExampleItemResponse\";"));

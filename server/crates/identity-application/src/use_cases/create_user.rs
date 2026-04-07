@@ -1,10 +1,11 @@
 use crate::{
-    ApplicationError, Clock, CredentialRepository, IdGenerator, PasswordHasher, TransactionManager,
-    UserRepository,
+    ApplicationError, Clock, IdGenerator, IdentityUnitOfWorkFactory, PasswordHasher,
+    UserIdentityReadModel, UserProfileReadModel, UserReadModel,
 };
 use ordering_food_identity_domain::{
     IdentityType, NormalizedIdentifier, User, UserIdentity, UserProfile,
 };
+use ordering_food_shared_kernel::Identifier;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,34 +25,28 @@ pub struct CreateUserInput {
 }
 
 pub struct CreateUser {
-    repository: Arc<dyn UserRepository>,
-    transaction_manager: Arc<dyn TransactionManager>,
+    unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
     clock: Arc<dyn Clock>,
     id_generator: Arc<dyn IdGenerator>,
     password_hasher: Arc<dyn PasswordHasher>,
-    credential_repository: Arc<dyn CredentialRepository>,
 }
 
 impl CreateUser {
     pub fn new(
-        repository: Arc<dyn UserRepository>,
-        transaction_manager: Arc<dyn TransactionManager>,
+        unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
         password_hasher: Arc<dyn PasswordHasher>,
-        credential_repository: Arc<dyn CredentialRepository>,
     ) -> Self {
         Self {
-            repository,
-            transaction_manager,
+            unit_of_work_factory,
             clock,
             id_generator,
             password_hasher,
-            credential_repository,
         }
     }
 
-    pub async fn execute(&self, input: CreateUserInput) -> Result<User, ApplicationError> {
+    pub async fn execute(&self, input: CreateUserInput) -> Result<UserReadModel, ApplicationError> {
         let now = self.clock.now();
         let profile = UserProfile::new(
             input.display_name,
@@ -59,52 +54,86 @@ impl CreateUser {
             input.family_name,
             input.avatar_url,
         )?;
+        let identities = input
+            .identities
+            .into_iter()
+            .map(|identity| -> Result<UserIdentity, ApplicationError> {
+                let identity_type = IdentityType::parse(identity.identity_type)?;
+                let identifier = NormalizedIdentifier::new(identity.identifier)?;
+                Ok(UserIdentity::new(identity_type, identifier, now))
+            })
+            .collect::<Result<Vec<_>, ApplicationError>>()?;
+        let password_hash = match input.password {
+            Some(raw_password) => Some(self.password_hasher.hash(&raw_password).await?),
+            None => None,
+        };
         let mut user = User::create(self.id_generator.next_user_id(), profile, now);
-        let mut tx = self.transaction_manager.begin().await?;
+        for identity in identities {
+            user.bind_identity(identity, now)?;
+        }
 
-        for identity in input.identities {
-            let identity_type = IdentityType::parse(identity.identity_type)?;
-            let identifier = NormalizedIdentifier::new(identity.identifier)?;
+        let mut unit_of_work = self.unit_of_work_factory.begin().await?;
 
-            if self
-                .repository
-                .find_by_identity(tx.as_mut(), &identity_type, &identifier)
-                .await?
-                .is_some()
+        for identity in user.identities() {
+            match unit_of_work
+                .find_user_by_identity(identity.identity_type(), identity.identifier_normalized())
+                .await
             {
-                self.transaction_manager.rollback(tx).await?;
-                return Err(ApplicationError::conflict(
-                    "identity is already bound to another user",
-                ));
-            }
-
-            if let Err(error) =
-                user.bind_identity(UserIdentity::new(identity_type, identifier, now), now)
-            {
-                self.transaction_manager.rollback(tx).await?;
-                return Err(error.into());
+                Ok(Some(_)) => {
+                    unit_of_work.rollback().await?;
+                    return Err(ApplicationError::conflict(
+                        "identity is already bound to another user",
+                    ));
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    unit_of_work.rollback().await?;
+                    return Err(error);
+                }
             }
         }
 
-        if let Err(error) = self.repository.insert(tx.as_mut(), &user).await {
-            self.transaction_manager.rollback(tx).await?;
+        if let Err(error) = unit_of_work.insert_user(&user).await {
+            unit_of_work.rollback().await?;
             return Err(error);
         }
 
-        if let Some(raw_password) = &input.password {
-            let password_hash = self.password_hasher.hash(raw_password).await?;
-            if let Err(error) = self
-                .credential_repository
-                .upsert(tx.as_mut(), user.id(), &password_hash, now)
+        if let Some(password_hash) = password_hash.as_deref()
+            && let Err(error) = unit_of_work
+                .upsert_credential(user.id(), password_hash, now)
                 .await
-            {
-                self.transaction_manager.rollback(tx).await?;
-                return Err(error);
-            }
+        {
+            unit_of_work.rollback().await?;
+            return Err(error);
         }
 
-        self.transaction_manager.commit(tx).await?;
-        Ok(user)
+        unit_of_work.commit().await?;
+        Ok(map_user_to_read_model(&user))
+    }
+}
+
+fn map_user_to_read_model(user: &User) -> UserReadModel {
+    UserReadModel {
+        user_id: user.id().as_str().to_string(),
+        status: user.status().as_str().to_string(),
+        profile: UserProfileReadModel {
+            display_name: user.profile().display_name().to_string(),
+            given_name: user.profile().given_name().map(ToOwned::to_owned),
+            family_name: user.profile().family_name().map(ToOwned::to_owned),
+            avatar_url: user.profile().avatar_url().map(ToOwned::to_owned),
+        },
+        identities: user
+            .identities()
+            .iter()
+            .map(|identity| UserIdentityReadModel {
+                identity_type: identity.identity_type().as_str().to_string(),
+                identifier_normalized: identity.identifier_normalized().as_str().to_string(),
+                bound_at: identity.bound_at(),
+            })
+            .collect(),
+        created_at: user.created_at(),
+        updated_at: user.updated_at(),
+        deleted_at: user.deleted_at(),
     }
 }
 
@@ -112,67 +141,14 @@ impl CreateUser {
 mod tests {
     use super::*;
     use crate::{
-        ApplicationError, Clock, CredentialRepository, IdGenerator, PasswordHasher,
-        StoredCredential, TransactionContext, TransactionManager, UserReadRepository,
-        UserRepository,
+        ApplicationError, IdGenerator, PasswordHasher,
+        testing::{FakeClock, FakeIdentityStore, FakeIdentityUnitOfWorkFactory},
     };
     use async_trait::async_trait;
     use ordering_food_identity_domain::{NormalizedIdentifier, UserId};
-    use ordering_food_shared_kernel::{Identifier, Timestamp};
-    use std::{
-        any::Any,
-        collections::HashMap,
-        sync::{Arc, Mutex},
-    };
+    use ordering_food_shared_kernel::Timestamp;
+    use std::sync::Arc;
     use time::macros::datetime;
-
-    #[derive(Default)]
-    struct FakeTransactionContext;
-
-    impl TransactionContext for FakeTransactionContext {
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-
-        fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-            self
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeTransactionManager {
-        begin_count: Mutex<u32>,
-        commit_count: Mutex<u32>,
-        rollback_count: Mutex<u32>,
-    }
-
-    #[async_trait]
-    impl TransactionManager for FakeTransactionManager {
-        async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
-            *self.begin_count.lock().unwrap() += 1;
-            Ok(Box::new(FakeTransactionContext))
-        }
-
-        async fn commit(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-            *self.commit_count.lock().unwrap() += 1;
-            Ok(())
-        }
-
-        async fn rollback(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-            *self.rollback_count.lock().unwrap() += 1;
-            Ok(())
-        }
-    }
-
-    struct FakeClock {
-        now: Timestamp,
-    }
-
-    impl Clock for FakeClock {
-        fn now(&self) -> Timestamp {
-            self.now
-        }
-    }
 
     struct FakeIdGenerator {
         next_id: UserId,
@@ -181,76 +157,6 @@ mod tests {
     impl IdGenerator for FakeIdGenerator {
         fn next_user_id(&self) -> UserId {
             self.next_id.clone()
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeRepository {
-        users: Mutex<HashMap<String, User>>,
-    }
-
-    #[async_trait]
-    impl UserRepository for FakeRepository {
-        async fn find_by_id(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user_id: &UserId,
-        ) -> Result<Option<User>, ApplicationError> {
-            Ok(self.users.lock().unwrap().get(user_id.as_str()).cloned())
-        }
-
-        async fn find_by_identity(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            identity_type: &IdentityType,
-            identifier: &NormalizedIdentifier,
-        ) -> Result<Option<User>, ApplicationError> {
-            Ok(self
-                .users
-                .lock()
-                .unwrap()
-                .values()
-                .find(|user| {
-                    user.identities().iter().any(|identity| {
-                        identity.identity_type() == identity_type
-                            && identity.identifier_normalized() == identifier
-                    })
-                })
-                .cloned())
-        }
-
-        async fn insert(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user: &User,
-        ) -> Result<(), ApplicationError> {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user.clone());
-            Ok(())
-        }
-
-        async fn update(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user: &User,
-        ) -> Result<(), ApplicationError> {
-            self.users
-                .lock()
-                .unwrap()
-                .insert(user.id().as_str().to_string(), user.clone());
-            Ok(())
-        }
-    }
-
-    #[async_trait]
-    impl UserReadRepository for FakeRepository {
-        async fn get_by_id(
-            &self,
-            _user_id: &UserId,
-        ) -> Result<Option<crate::UserReadModel>, ApplicationError> {
-            Ok(None)
         }
     }
 
@@ -268,74 +174,25 @@ mod tests {
         }
     }
 
-    #[derive(Default)]
-    struct FakeCredentialRepository {
-        upserts: Mutex<Vec<(String, String, Timestamp)>>,
-        fail_upsert: Mutex<bool>,
-    }
-
-    impl FakeCredentialRepository {
-        fn fail_on_upsert(&self) {
-            *self.fail_upsert.lock().unwrap() = true;
-        }
-    }
-
-    #[async_trait]
-    impl CredentialRepository for FakeCredentialRepository {
-        async fn find_by_user_id(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            _user_id: &UserId,
-        ) -> Result<Option<StoredCredential>, ApplicationError> {
-            Ok(None)
-        }
-
-        async fn upsert(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            user_id: &UserId,
-            password_hash: &str,
-            now: Timestamp,
-        ) -> Result<(), ApplicationError> {
-            if *self.fail_upsert.lock().unwrap() {
-                return Err(ApplicationError::unexpected("credential upsert failed"));
-            }
-
-            self.upserts.lock().unwrap().push((
-                user_id.as_str().to_string(),
-                password_hash.to_string(),
-                now,
-            ));
-            Ok(())
-        }
-    }
-
     fn build_create_user(
-        repository: Arc<FakeRepository>,
-        transactions: Arc<FakeTransactionManager>,
-        credential_repository: Arc<FakeCredentialRepository>,
+        transactions: Arc<FakeIdentityUnitOfWorkFactory>,
         now: Timestamp,
         next_id: UserId,
     ) -> CreateUser {
         CreateUser::new(
-            repository,
             transactions,
             Arc::new(FakeClock { now }),
             Arc::new(FakeIdGenerator { next_id }),
             Arc::new(FakePasswordHasher),
-            credential_repository,
         )
     }
 
     #[tokio::test]
     async fn create_user_generates_id_and_persists_aggregate() {
-        let repository = Arc::new(FakeRepository::default());
-        let transactions = Arc::new(FakeTransactionManager::default());
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        let store = Arc::new(FakeIdentityStore::default());
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store.clone()));
         let create_user = build_create_user(
-            repository.clone(),
             transactions.clone(),
-            credential_repository.clone(),
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-1"),
         );
@@ -355,18 +212,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(user.id().as_str(), "user-1");
-        assert_eq!(user.identities().len(), 1);
+        assert_eq!(user.user_id, "user-1");
+        assert_eq!(user.identities.len(), 1);
         assert_eq!(*transactions.commit_count.lock().unwrap(), 1);
-        assert!(repository.users.lock().unwrap().contains_key("user-1"));
-        assert!(credential_repository.upserts.lock().unwrap().is_empty());
+        assert!(store.users().contains_key("user-1"));
+        assert!(store.credentials().is_empty());
     }
 
     #[tokio::test]
     async fn create_user_rolls_back_when_identity_conflicts() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.users.lock().unwrap().insert(
-            "existing".to_string(),
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(
             User::rehydrate(
                 UserId::new("existing"),
                 ordering_food_identity_domain::UserStatus::Active,
@@ -383,12 +239,9 @@ mod tests {
             .unwrap(),
         );
 
-        let transactions = Arc::new(FakeTransactionManager::default());
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store));
         let create_user = build_create_user(
-            repository,
             transactions.clone(),
-            credential_repository,
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-2"),
         );
@@ -414,13 +267,10 @@ mod tests {
 
     #[tokio::test]
     async fn create_user_persists_hashed_password_when_password_is_present() {
-        let repository = Arc::new(FakeRepository::default());
-        let transactions = Arc::new(FakeTransactionManager::default());
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        let store = Arc::new(FakeIdentityStore::default());
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store.clone()));
         let create_user = build_create_user(
-            repository,
             transactions.clone(),
-            credential_repository.clone(),
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-3"),
         );
@@ -440,22 +290,19 @@ mod tests {
             .await
             .unwrap();
 
-        let upserts = credential_repository.upserts.lock().unwrap();
-        assert_eq!(upserts.len(), 1);
-        assert_eq!(upserts[0].0, user.id().as_str());
-        assert_eq!(upserts[0].1, "hashed:secret123");
+        let credentials = store.credentials();
+        let credential = credentials.get(&user.user_id).unwrap();
+        assert_eq!(credential.user_id, user.user_id);
+        assert_eq!(credential.password_hash, "hashed:secret123");
         assert_eq!(*transactions.commit_count.lock().unwrap(), 1);
     }
 
     #[tokio::test]
     async fn create_user_skips_credential_write_when_password_is_absent() {
-        let repository = Arc::new(FakeRepository::default());
-        let transactions = Arc::new(FakeTransactionManager::default());
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
+        let store = Arc::new(FakeIdentityStore::default());
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store.clone()));
         let create_user = build_create_user(
-            repository,
             transactions,
-            credential_repository.clone(),
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-4"),
         );
@@ -475,19 +322,16 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(credential_repository.upserts.lock().unwrap().is_empty());
+        assert!(store.credentials().is_empty());
     }
 
     #[tokio::test]
     async fn create_user_rolls_back_when_credential_upsert_fails() {
-        let repository = Arc::new(FakeRepository::default());
-        let transactions = Arc::new(FakeTransactionManager::default());
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.fail_on_upsert();
+        let store = Arc::new(FakeIdentityStore::default());
+        store.fail_on_credential_upsert();
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store.clone()));
         let create_user = build_create_user(
-            repository.clone(),
             transactions.clone(),
-            credential_repository.clone(),
             datetime!(2026-03-10 08:00 UTC),
             UserId::new("user-5"),
         );
@@ -510,6 +354,7 @@ mod tests {
         assert!(matches!(error, ApplicationError::Unexpected { .. }));
         assert_eq!(*transactions.rollback_count.lock().unwrap(), 1);
         assert_eq!(*transactions.commit_count.lock().unwrap(), 0);
-        assert!(credential_repository.upserts.lock().unwrap().is_empty());
+        assert!(store.credentials().is_empty());
+        assert!(!store.users().contains_key("user-5"));
     }
 }

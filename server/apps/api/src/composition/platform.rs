@@ -1,8 +1,7 @@
 use crate::{
-    config::Settings,
-    runtime::{SystemClock, UuidV4UserIdGenerator},
+    composition::capabilities::ApiCapabilityRegistry, config::Settings, runtime::SystemClock,
 };
-use ordering_food_identity_application::{Clock, IdGenerator};
+use ordering_food_platform_kernel::Clock;
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -12,7 +11,7 @@ pub struct ApiPlatform {
     pub pg_pool: PgPool,
     pub redis_client: redis::Client,
     pub clock: Arc<dyn Clock>,
-    pub id_generator: Arc<dyn IdGenerator>,
+    pub capabilities: Arc<ApiCapabilityRegistry>,
 }
 
 impl ApiPlatform {
@@ -22,7 +21,7 @@ impl ApiPlatform {
             pg_pool,
             redis_client,
             clock: Arc::new(SystemClock),
-            id_generator: Arc::new(UuidV4UserIdGenerator),
+            capabilities: Arc::new(ApiCapabilityRegistry::new()),
         }
     }
 }

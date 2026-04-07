@@ -94,7 +94,7 @@ fn build_status_lines(
             (
                 migration.version,
                 (
-                    migration.description.to_string(),
+                    display_description(migration.version, &migration.description),
                     migration.checksum.as_ref().to_vec(),
                 ),
             )
@@ -127,7 +127,7 @@ fn build_status_lines(
         .filter(|migration| migration.migration_type.is_up_migration())
         .map(|migration| MigrationStatusLine {
             version: migration.version,
-            description: migration.description.to_string(),
+            description: display_description(migration.version, &migration.description),
             status: if applied_versions.contains(&migration.version) {
                 "installed"
             } else {
@@ -135,6 +135,17 @@ fn build_status_lines(
             },
         })
         .collect())
+}
+
+fn display_description(version: i64, description: &str) -> String {
+    match version {
+        202604050302 => "menu context drop".to_string(),
+        202604050401 => "fulfillment context".to_string(),
+        202604050402 => "ordering commercial contraction".to_string(),
+        202604050405 => "platform outbox and projection checkpoints".to_string(),
+        202604050406 => "fulfillment ordering projections".to_string(),
+        _ => description.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -149,7 +160,7 @@ mod tests {
     fn build_status_lines_marks_unapplied_migrations_as_pending() {
         let lines = build_status_lines(&[]).unwrap();
 
-        assert_eq!(lines.len(), 3);
+        assert_eq!(lines.len(), 13);
         assert_eq!(lines[0].version, 202603140001);
         assert_eq!(lines[0].status, "pending");
         assert_eq!(lines[0].description, "baseline");
@@ -159,6 +170,39 @@ mod tests {
         assert_eq!(lines[2].version, 202603150002);
         assert_eq!(lines[2].status, "pending");
         assert_eq!(lines[2].description, "authz");
+        assert_eq!(lines[3].version, 202604050101);
+        assert_eq!(lines[3].status, "pending");
+        assert_eq!(lines[3].description, "organization foundation");
+        assert_eq!(lines[4].version, 202604050201);
+        assert_eq!(lines[4].status, "pending");
+        assert_eq!(lines[4].description, "access");
+        assert_eq!(lines[5].version, 202604050301);
+        assert_eq!(lines[5].status, "pending");
+        assert_eq!(lines[5].description, "catalog context");
+        assert_eq!(lines[6].version, 202604050302);
+        assert_eq!(lines[6].status, "pending");
+        assert_eq!(lines[6].description, "menu context drop");
+        assert_eq!(lines[7].version, 202604050401);
+        assert_eq!(lines[7].status, "pending");
+        assert_eq!(lines[7].description, "fulfillment context");
+        assert_eq!(lines[8].version, 202604050402);
+        assert_eq!(lines[8].status, "pending");
+        assert_eq!(lines[8].description, "ordering commercial contraction");
+        assert_eq!(lines[9].version, 202604050403);
+        assert_eq!(lines[9].status, "pending");
+        assert_eq!(lines[9].description, "fulfillment identity split");
+        assert_eq!(lines[10].version, 202604050404);
+        assert_eq!(lines[10].status, "pending");
+        assert_eq!(lines[10].description, "catalog boundary cleanup");
+        assert_eq!(lines[11].version, 202604050405);
+        assert_eq!(lines[11].status, "pending");
+        assert_eq!(
+            lines[11].description,
+            "platform outbox and projection checkpoints"
+        );
+        assert_eq!(lines[12].version, 202604050406);
+        assert_eq!(lines[12].status, "pending");
+        assert_eq!(lines[12].description, "fulfillment ordering projections");
     }
 
     #[test]

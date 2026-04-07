@@ -7,4 +7,6 @@ pub mod observability;
 pub mod readiness;
 pub mod routes;
 pub mod runtime;
+#[cfg(test)]
+pub mod testing;
 pub mod ts_bindings;

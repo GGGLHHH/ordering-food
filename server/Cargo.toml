@@ -1,22 +1,41 @@
 [workspace]
 members = [
     "apps/api",
-    "crates/authz-domain",
-    "crates/authz-application",
-    "crates/authz-infrastructure-sqlx",
     "crates/database-infrastructure-sqlx",
-    "crates/order-domain",
-    "crates/order-application",
-    "crates/order-infrastructure-sqlx",
     "crates/shared-kernel",
+    "crates/platform-kernel",
     "crates/identity-domain",
     "crates/identity-application",
     "crates/identity-infrastructure-sqlx",
     "crates/identity-infrastructure-auth",
-    "crates/menu-domain",
-    "crates/menu-application",
-    "crates/menu-infrastructure-sqlx",
     "crates/bootstrap-core",
+    "crates/identity-published",
+    "crates/catalog-published",
+    "crates/ordering-published",
+    "crates/access-published",
+    "crates/organization-published",
+    "crates/fulfillment-published",
+    "crates/identity-integration",
+    "crates/catalog-integration",
+    "crates/catalog-domain",
+    "crates/catalog-application",
+    "crates/catalog-infrastructure-sqlx",
+    "crates/ordering-domain",
+    "crates/ordering-application",
+    "crates/ordering-infrastructure-sqlx",
+    "crates/ordering-integration",
+    "crates/access-integration",
+    "crates/organization-integration",
+    "crates/fulfillment-integration",
+    "crates/access-domain",
+    "crates/access-application",
+    "crates/access-infrastructure-sqlx",
+    "crates/organization-domain",
+    "crates/organization-application",
+    "crates/organization-infrastructure-sqlx",
+    "crates/fulfillment-domain",
+    "crates/fulfillment-application",
+    "crates/fulfillment-infrastructure-sqlx",
 ]
 resolver = "3"
 
@@ -37,11 +56,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_path_to_error = "0.1"
 serde_urlencoded = "0.7"
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "migrate", "time", "uuid", "macros"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "migrate", "time", "uuid", "macros", "json"] }
 statig = "0.4.1"
 thiserror = "2"
 time = { version = "0.3", features = ["formatting", "macros", "parsing", "serde"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "request-id", "trace", "util"] }
 tracing = "0.1"

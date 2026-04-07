@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS fulfillment.ordering_order_projection_items;
+DROP INDEX IF EXISTS fulfillment.idx_fulfillment_ordering_order_projections_store_created_at;
+DROP TABLE IF EXISTS fulfillment.ordering_order_projections;

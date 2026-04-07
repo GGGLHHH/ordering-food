@@ -2,6 +2,9 @@ use async_trait::async_trait;
 use ordering_food_identity_application::{
     AccessTokenClaims, ApplicationError, TokenPair, TokenService,
 };
+use ordering_food_identity_published::{
+    AccessTokenVerifier, AuthenticatedSubjectRef, IdentityCollaborationError,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,6 +74,17 @@ impl TokenService for JwtTokenService {
             user_id: token_data.claims.sub,
             exp: token_data.claims.exp,
         })
+    }
+}
+
+impl AccessTokenVerifier for JwtTokenService {
+    fn verify_access_token(
+        &self,
+        token: &str,
+    ) -> Result<AuthenticatedSubjectRef, IdentityCollaborationError> {
+        <Self as TokenService>::verify_access_token(self, token)
+            .map(|claims| AuthenticatedSubjectRef::new(claims.user_id))
+            .map_err(|_| IdentityCollaborationError::new("invalid or expired access token"))
     }
 }
 

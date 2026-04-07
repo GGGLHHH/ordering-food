@@ -23,6 +23,11 @@ access_token_ttl_seconds = 900
 refresh_token_ttl_seconds = 604800
 cookie_domain = ""
 cookie_secure = true
+
+[catalog.bootstrap]
+brand_id = "00000000-0000-4000-8000-000000000001"
+brand_slug = "ordering-food"
+brand_name = "Ordering Food"
 "#;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -31,6 +36,7 @@ pub struct Settings {
     pub database: DatabaseSettings,
     pub redis: RedisSettings,
     pub auth: AuthSettings,
+    pub catalog: CatalogSettings,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -62,6 +68,19 @@ pub struct AuthSettings {
     pub cookie_domain: String,
     #[serde(default = "default_true")]
     pub cookie_secure: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CatalogSettings {
+    pub bootstrap: CatalogBootstrapSettings,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CatalogBootstrapSettings {
+    // Local-only fallback used when organization scope has not been seeded yet.
+    pub brand_id: String,
+    pub brand_slug: String,
+    pub brand_name: String,
 }
 
 fn default_true() -> bool {
@@ -190,6 +209,27 @@ fn build_override_toml(overrides: &BTreeMap<String, String>) -> Result<String> {
         lines.push(format!("auth.cookie_secure = {cookie_secure}"));
     }
 
+    if let Some(brand_id) = overrides.get("CATALOG__BOOTSTRAP__BRAND_ID") {
+        lines.push(format!(
+            "catalog.bootstrap.brand_id = {}",
+            quote_toml_string(brand_id)
+        ));
+    }
+
+    if let Some(brand_slug) = overrides.get("CATALOG__BOOTSTRAP__BRAND_SLUG") {
+        lines.push(format!(
+            "catalog.bootstrap.brand_slug = {}",
+            quote_toml_string(brand_slug)
+        ));
+    }
+
+    if let Some(brand_name) = overrides.get("CATALOG__BOOTSTRAP__BRAND_NAME") {
+        lines.push(format!(
+            "catalog.bootstrap.brand_name = {}",
+            quote_toml_string(brand_name)
+        ));
+    }
+
     Ok(lines.join("\n"))
 }
 
@@ -220,6 +260,9 @@ fn is_supported_env_key(key: &str) -> bool {
             | "AUTH__REFRESH_TOKEN_TTL_SECONDS"
             | "AUTH__COOKIE_DOMAIN"
             | "AUTH__COOKIE_SECURE"
+            | "CATALOG__BOOTSTRAP__BRAND_ID"
+            | "CATALOG__BOOTSTRAP__BRAND_SLUG"
+            | "CATALOG__BOOTSTRAP__BRAND_NAME"
     )
 }
 
@@ -241,6 +284,12 @@ mod tests {
         );
         assert_eq!(settings.database.max_connections, 10);
         assert_eq!(settings.redis.url, "redis://127.0.0.1:6379");
+        assert_eq!(
+            settings.catalog.bootstrap.brand_id,
+            "00000000-0000-4000-8000-000000000001"
+        );
+        assert_eq!(settings.catalog.bootstrap.brand_slug, "ordering-food");
+        assert_eq!(settings.catalog.bootstrap.brand_name, "Ordering Food");
     }
 
     #[test]
@@ -258,6 +307,12 @@ mod tests {
             ),
             ("DATABASE__MAX_CONNECTIONS", "25"),
             ("REDIS__URL", "redis://127.0.0.1:6380"),
+            (
+                "CATALOG__BOOTSTRAP__BRAND_ID",
+                "10000000-0000-4000-8000-000000000001",
+            ),
+            ("CATALOG__BOOTSTRAP__BRAND_SLUG", "custom-brand"),
+            ("CATALOG__BOOTSTRAP__BRAND_NAME", "Custom Brand"),
         ])
         .unwrap();
 
@@ -276,6 +331,32 @@ mod tests {
         );
         assert_eq!(settings.database.max_connections, 25);
         assert_eq!(settings.redis.url, "redis://127.0.0.1:6380");
+        assert_eq!(
+            settings.catalog.bootstrap.brand_id,
+            "10000000-0000-4000-8000-000000000001"
+        );
+        assert_eq!(settings.catalog.bootstrap.brand_slug, "custom-brand");
+        assert_eq!(settings.catalog.bootstrap.brand_name, "Custom Brand");
+    }
+
+    #[test]
+    fn ignores_catalog_store_identity_override_keys() {
+        let settings = Settings::from_overrides([
+            ("CATALOG__BOOTSTRAP__STORE_ID", "store-override"),
+            ("CATALOG__BOOTSTRAP__STORE_SLUG", "store-slug-override"),
+            (
+                "CATALOG__BOOTSTRAP__BRAND_ID",
+                "10000000-0000-4000-8000-000000000001",
+            ),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            settings.catalog.bootstrap.brand_id,
+            "10000000-0000-4000-8000-000000000001"
+        );
+        assert_eq!(settings.catalog.bootstrap.brand_slug, "ordering-food");
+        assert_eq!(settings.catalog.bootstrap.brand_name, "Ordering Food");
     }
 
     #[test]

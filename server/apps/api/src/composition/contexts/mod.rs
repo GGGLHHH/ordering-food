@@ -1,8 +1,10 @@
-mod authz;
+mod access;
+mod catalog;
 mod database;
+mod fulfillment;
 mod identity;
-mod menu;
-mod order;
+mod ordering;
+mod organization;
 
 use crate::composition::context_registration::ApiContextRegistration;
 
@@ -10,8 +12,10 @@ pub fn registrations() -> Vec<ApiContextRegistration> {
     vec![
         database::register_database(),
         identity::register_identity(),
-        authz::register_authz(),
-        menu::register_menu(),
-        order::register_order(),
+        access::register_access(),
+        organization::register_organization(),
+        catalog::register_catalog(),
+        ordering::register_ordering(),
+        fulfillment::register_fulfillment(),
     ]
 }

@@ -1,4 +1,4 @@
-use crate::{ApplicationError, Clock, TransactionManager, UserRepository};
+use crate::{ApplicationError, Clock, IdentityUnitOfWorkFactory};
 use ordering_food_identity_domain::{UserId, UserProfile};
 use std::sync::Arc;
 
@@ -12,53 +12,52 @@ pub struct UpdateUserProfileInput {
 }
 
 pub struct UpdateUserProfile {
-    repository: Arc<dyn UserRepository>,
-    transaction_manager: Arc<dyn TransactionManager>,
+    unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
     clock: Arc<dyn Clock>,
 }
 
 impl UpdateUserProfile {
     pub fn new(
-        repository: Arc<dyn UserRepository>,
-        transaction_manager: Arc<dyn TransactionManager>,
+        unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
         clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
-            repository,
-            transaction_manager,
+            unit_of_work_factory,
             clock,
         }
     }
 
     pub async fn execute(&self, input: UpdateUserProfileInput) -> Result<(), ApplicationError> {
-        let mut tx = self.transaction_manager.begin().await?;
+        let profile = UserProfile::new(
+            input.display_name,
+            input.given_name,
+            input.family_name,
+            input.avatar_url,
+        )?;
+        let mut unit_of_work = self.unit_of_work_factory.begin().await?;
         let user_id = UserId::new(input.user_id);
-        let mut user = match self.repository.find_by_id(tx.as_mut(), &user_id).await? {
-            Some(user) => user,
-            None => {
-                self.transaction_manager.rollback(tx).await?;
+        let mut user = match unit_of_work.find_user_by_id(&user_id).await {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                unit_of_work.rollback().await?;
                 return Err(ApplicationError::not_found("user was not found"));
+            }
+            Err(error) => {
+                unit_of_work.rollback().await?;
+                return Err(error);
             }
         };
 
-        if let Err(error) = user.update_profile(
-            UserProfile::new(
-                input.display_name,
-                input.given_name,
-                input.family_name,
-                input.avatar_url,
-            )?,
-            self.clock.now(),
-        ) {
-            self.transaction_manager.rollback(tx).await?;
+        if let Err(error) = user.update_profile(profile, self.clock.now()) {
+            unit_of_work.rollback().await?;
             return Err(error.into());
         }
 
-        if let Err(error) = self.repository.update(tx.as_mut(), &user).await {
-            self.transaction_manager.rollback(tx).await?;
+        if let Err(error) = unit_of_work.update_user(&user).await {
+            unit_of_work.rollback().await?;
             return Err(error);
         }
 
-        self.transaction_manager.commit(tx).await
+        unit_of_work.commit().await
     }
 }

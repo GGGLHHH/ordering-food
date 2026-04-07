@@ -1,69 +1,57 @@
 use crate::{
-    BindUserIdentity, Clock, CreateUser, CredentialRepository, DisableUser, IdGenerator, Login,
-    Logout, PasswordHasher, RefreshToken, RefreshTokenStore, SoftDeleteUser, TokenService,
-    TransactionManager, UpdateUserProfile, UserQueryService, UserReadRepository, UserRepository,
+    BindUserIdentity, Clock, CreateUser, DisableUser, IdGenerator, IdentityUnitOfWorkFactory,
+    Login, Logout, PasswordHasher, RefreshToken, RefreshTokenStore, SoftDeleteUser, TokenService,
+    UpdateUserProfile, UserQueryService, UserReadRepository,
 };
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct IdentityModule {
-    pub create_user: Arc<CreateUser>,
-    pub update_user_profile: Arc<UpdateUserProfile>,
-    pub bind_user_identity: Arc<BindUserIdentity>,
-    pub disable_user: Arc<DisableUser>,
-    pub soft_delete_user: Arc<SoftDeleteUser>,
-    pub user_queries: Arc<UserQueryService>,
-    pub login: Arc<Login>,
-    pub refresh_token: Arc<RefreshToken>,
-    pub logout: Arc<Logout>,
+    create_user: Arc<CreateUser>,
+    update_user_profile: Arc<UpdateUserProfile>,
+    bind_user_identity: Arc<BindUserIdentity>,
+    disable_user: Arc<DisableUser>,
+    soft_delete_user: Arc<SoftDeleteUser>,
+    user_queries: Arc<UserQueryService>,
+    login: Arc<Login>,
+    refresh_token: Arc<RefreshToken>,
+    logout: Arc<Logout>,
 }
 
 impl IdentityModule {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        user_repository: Arc<dyn UserRepository>,
         user_read_repository: Arc<dyn UserReadRepository>,
-        transaction_manager: Arc<dyn TransactionManager>,
+        unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
-        credential_repository: Arc<dyn CredentialRepository>,
         password_hasher: Arc<dyn PasswordHasher>,
         token_service: Arc<dyn TokenService>,
         refresh_token_store: Arc<dyn RefreshTokenStore>,
     ) -> Self {
         Self {
             create_user: Arc::new(CreateUser::new(
-                user_repository.clone(),
-                transaction_manager.clone(),
+                unit_of_work_factory.clone(),
                 clock.clone(),
                 id_generator,
                 password_hasher.clone(),
-                credential_repository.clone(),
             )),
             update_user_profile: Arc::new(UpdateUserProfile::new(
-                user_repository.clone(),
-                transaction_manager.clone(),
+                unit_of_work_factory.clone(),
                 clock.clone(),
             )),
             bind_user_identity: Arc::new(BindUserIdentity::new(
-                user_repository.clone(),
-                transaction_manager.clone(),
+                unit_of_work_factory.clone(),
                 clock.clone(),
             )),
             disable_user: Arc::new(DisableUser::new(
-                user_repository.clone(),
-                transaction_manager.clone(),
+                unit_of_work_factory.clone(),
                 clock.clone(),
             )),
-            soft_delete_user: Arc::new(SoftDeleteUser::new(
-                user_repository.clone(),
-                transaction_manager.clone(),
-                clock,
-            )),
+            soft_delete_user: Arc::new(SoftDeleteUser::new(unit_of_work_factory.clone(), clock)),
             user_queries: Arc::new(UserQueryService::new(user_read_repository.clone())),
             login: Arc::new(Login::new(
-                user_repository,
-                credential_repository,
-                transaction_manager,
+                unit_of_work_factory,
                 password_hasher,
                 token_service.clone(),
                 refresh_token_store.clone(),
@@ -75,5 +63,41 @@ impl IdentityModule {
             )),
             logout: Arc::new(Logout::new(refresh_token_store)),
         }
+    }
+
+    pub fn create_user(&self) -> &Arc<CreateUser> {
+        &self.create_user
+    }
+
+    pub fn update_user_profile(&self) -> &Arc<UpdateUserProfile> {
+        &self.update_user_profile
+    }
+
+    pub fn bind_user_identity(&self) -> &Arc<BindUserIdentity> {
+        &self.bind_user_identity
+    }
+
+    pub fn disable_user(&self) -> &Arc<DisableUser> {
+        &self.disable_user
+    }
+
+    pub fn soft_delete_user(&self) -> &Arc<SoftDeleteUser> {
+        &self.soft_delete_user
+    }
+
+    pub fn user_queries(&self) -> &Arc<UserQueryService> {
+        &self.user_queries
+    }
+
+    pub fn login(&self) -> &Arc<Login> {
+        &self.login
+    }
+
+    pub fn refresh_token(&self) -> &Arc<RefreshToken> {
+        &self.refresh_token
+    }
+
+    pub fn logout(&self) -> &Arc<Logout> {
+        &self.logout
     }
 }

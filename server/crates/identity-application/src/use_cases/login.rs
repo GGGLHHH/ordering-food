@@ -1,6 +1,6 @@
 use crate::{
-    ApplicationError, CredentialRepository, PasswordHasher, RefreshTokenStore, TokenPair,
-    TokenService, TransactionManager, UserRepository,
+    ApplicationError, IdentityUnitOfWorkFactory, PasswordHasher, RefreshTokenStore, TokenPair,
+    TokenService,
 };
 use ordering_food_identity_domain::{IdentityType, NormalizedIdentifier, UserStatus};
 use ordering_food_shared_kernel::Identifier;
@@ -20,9 +20,7 @@ pub struct LoginOutput {
 }
 
 pub struct Login {
-    user_repository: Arc<dyn UserRepository>,
-    credential_repository: Arc<dyn CredentialRepository>,
-    transaction_manager: Arc<dyn TransactionManager>,
+    unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
     password_hasher: Arc<dyn PasswordHasher>,
     token_service: Arc<dyn TokenService>,
     refresh_token_store: Arc<dyn RefreshTokenStore>,
@@ -30,17 +28,13 @@ pub struct Login {
 
 impl Login {
     pub fn new(
-        user_repository: Arc<dyn UserRepository>,
-        credential_repository: Arc<dyn CredentialRepository>,
-        transaction_manager: Arc<dyn TransactionManager>,
+        unit_of_work_factory: Arc<dyn IdentityUnitOfWorkFactory>,
         password_hasher: Arc<dyn PasswordHasher>,
         token_service: Arc<dyn TokenService>,
         refresh_token_store: Arc<dyn RefreshTokenStore>,
     ) -> Self {
         Self {
-            user_repository,
-            credential_repository,
-            transaction_manager,
+            unit_of_work_factory,
             password_hasher,
             token_service,
             refresh_token_store,
@@ -51,34 +45,43 @@ impl Login {
         let identity_type = IdentityType::parse(&input.identity_type)?;
         let identifier = NormalizedIdentifier::new(&input.identifier)?;
 
-        let mut tx = self.transaction_manager.begin().await?;
+        let mut unit_of_work = self.unit_of_work_factory.begin().await?;
 
-        let user = self
-            .user_repository
-            .find_by_identity(tx.as_mut(), &identity_type, &identifier)
-            .await?;
+        let user = match unit_of_work
+            .find_user_by_identity(&identity_type, &identifier)
+            .await
+        {
+            Ok(user) => user,
+            Err(error) => {
+                unit_of_work.rollback().await?;
+                return Err(error);
+            }
+        };
 
         let user = match user {
             Some(u) => u,
             None => {
-                self.transaction_manager.rollback(tx).await?;
+                unit_of_work.rollback().await?;
                 return Err(ApplicationError::unauthorized("invalid credentials"));
             }
         };
 
         if user.is_deleted() || user.status() != UserStatus::Active {
-            self.transaction_manager.rollback(tx).await?;
+            unit_of_work.rollback().await?;
             return Err(ApplicationError::unauthorized("invalid credentials"));
         }
 
         let user_id_str = Identifier::as_str(user.id()).to_string();
 
-        let credential = self
-            .credential_repository
-            .find_by_user_id(tx.as_mut(), user.id())
-            .await?;
+        let credential = match unit_of_work.find_credential_by_user_id(user.id()).await {
+            Ok(credential) => credential,
+            Err(error) => {
+                unit_of_work.rollback().await?;
+                return Err(error);
+            }
+        };
 
-        self.transaction_manager.commit(tx).await?;
+        unit_of_work.commit().await?;
 
         let credential = match credential {
             Some(c) => c,
@@ -115,69 +118,19 @@ impl Login {
 mod tests {
     use super::*;
     use crate::{
-        AccessTokenClaims, ApplicationError, CredentialRepository, PasswordHasher,
-        RefreshTokenStore, StoredCredential, TokenService,
-        testing::{FakeRepository, FakeTransactionManager},
+        AccessTokenClaims, ApplicationError, PasswordHasher, RefreshTokenStore, StoredCredential,
+        TokenService,
+        testing::{FakeIdentityStore, FakeIdentityUnitOfWorkFactory},
     };
     use async_trait::async_trait;
     use ordering_food_identity_domain::{
         IdentityType, NormalizedIdentifier, User, UserId, UserIdentity, UserProfile, UserStatus,
     };
-    use ordering_food_shared_kernel::Timestamp;
     use std::{
         collections::HashMap,
         sync::{Arc, Mutex},
     };
     use time::macros::datetime;
-
-    #[derive(Default)]
-    struct FakeCredentialRepository {
-        credentials: Mutex<HashMap<String, StoredCredential>>,
-    }
-
-    impl FakeCredentialRepository {
-        fn seed(&self, credential: StoredCredential) {
-            self.credentials
-                .lock()
-                .unwrap()
-                .insert(credential.user_id.clone(), credential);
-        }
-    }
-
-    #[async_trait]
-    impl CredentialRepository for FakeCredentialRepository {
-        async fn find_by_user_id(
-            &self,
-            _tx: &mut dyn crate::TransactionContext,
-            user_id: &UserId,
-        ) -> Result<Option<StoredCredential>, ApplicationError> {
-            Ok(self
-                .credentials
-                .lock()
-                .unwrap()
-                .get(user_id.as_str())
-                .cloned())
-        }
-
-        async fn upsert(
-            &self,
-            _tx: &mut dyn crate::TransactionContext,
-            user_id: &UserId,
-            password_hash: &str,
-            now: Timestamp,
-        ) -> Result<(), ApplicationError> {
-            self.credentials.lock().unwrap().insert(
-                user_id.as_str().to_string(),
-                StoredCredential {
-                    user_id: user_id.as_str().to_string(),
-                    password_hash: password_hash.to_string(),
-                    created_at: now,
-                    updated_at: now,
-                },
-            );
-            Ok(())
-        }
-    }
 
     struct FakePasswordHasher;
 
@@ -279,14 +232,10 @@ mod tests {
     }
 
     fn build_login_use_case(
-        repository: Arc<FakeRepository>,
-        credential_repository: Arc<FakeCredentialRepository>,
+        transactions: Arc<FakeIdentityUnitOfWorkFactory>,
         refresh_token_store: Arc<FakeRefreshTokenStore>,
-        transactions: Arc<FakeTransactionManager>,
     ) -> Login {
         Login::new(
-            repository,
-            credential_repository,
             transactions,
             Arc::new(FakePasswordHasher),
             Arc::new(FakeTokenService),
@@ -296,11 +245,9 @@ mod tests {
 
     #[tokio::test]
     async fn login_returns_token_pair_for_active_user() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 08:00 UTC),
@@ -308,13 +255,8 @@ mod tests {
         });
 
         let refresh_token_store = Arc::new(FakeRefreshTokenStore::default());
-        let transactions = Arc::new(FakeTransactionManager::default());
-        let use_case = build_login_use_case(
-            repository,
-            credential_repository,
-            refresh_token_store.clone(),
-            transactions.clone(),
-        );
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store));
+        let use_case = build_login_use_case(transactions.clone(), refresh_token_store.clone());
 
         let output = use_case
             .execute(LoginInput {
@@ -342,27 +284,24 @@ mod tests {
 
     #[tokio::test]
     async fn login_rejects_disabled_user() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user(
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user(
             "user-1",
             "alice@example.com",
             UserStatus::Disabled,
         ));
 
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 08:00 UTC),
             updated_at: datetime!(2026-03-10 08:00 UTC),
         });
 
-        let transactions = Arc::new(FakeTransactionManager::default());
+        let transactions = Arc::new(FakeIdentityUnitOfWorkFactory::new(store));
         let use_case = build_login_use_case(
-            repository,
-            credential_repository,
-            Arc::new(FakeRefreshTokenStore::default()),
             transactions.clone(),
+            Arc::new(FakeRefreshTokenStore::default()),
         );
 
         let error = use_case
@@ -384,11 +323,9 @@ mod tests {
 
     #[tokio::test]
     async fn login_rejects_invalid_password() {
-        let repository = Arc::new(FakeRepository::default());
-        repository.seed(make_user("user-1", "alice@example.com", UserStatus::Active));
-
-        let credential_repository = Arc::new(FakeCredentialRepository::default());
-        credential_repository.seed(StoredCredential {
+        let store = Arc::new(FakeIdentityStore::default());
+        store.seed_user(make_user("user-1", "alice@example.com", UserStatus::Active));
+        store.seed_credential(StoredCredential {
             user_id: "user-1".to_string(),
             password_hash: "hashed:secret123".to_string(),
             created_at: datetime!(2026-03-10 08:00 UTC),
@@ -396,10 +333,8 @@ mod tests {
         });
 
         let use_case = build_login_use_case(
-            repository,
-            credential_repository,
+            Arc::new(FakeIdentityUnitOfWorkFactory::new(store)),
             Arc::new(FakeRefreshTokenStore::default()),
-            Arc::new(FakeTransactionManager::default()),
         );
 
         let error = use_case

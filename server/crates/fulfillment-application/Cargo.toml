@@ -1,0 +1,19 @@
+[package]
+name = "ordering-food-fulfillment-application"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ordering-food-fulfillment-domain = { path = "../fulfillment-domain" }
+ordering-food-ordering-published = { path = "../ordering-published" }
+ordering-food-platform-kernel = { path = "../platform-kernel" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+time.workspace = true
+tokio.workspace = true

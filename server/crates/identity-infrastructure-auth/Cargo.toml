@@ -10,6 +10,7 @@ async-trait.workspace = true
 argon2.workspace = true
 jsonwebtoken.workspace = true
 ordering-food-identity-application = { path = "../identity-application" }
+ordering-food-identity-published = { path = "../identity-published" }
 ordering-food-shared-kernel = { path = "../shared-kernel" }
 redis.workspace = true
 serde.workspace = true

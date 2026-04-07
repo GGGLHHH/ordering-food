@@ -1,0 +1,17 @@
+[package]
+name = "ordering-food-access-infrastructure-sqlx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ordering-food-access-application = { path = "../access-application" }
+ordering-food-access-domain = { path = "../access-domain" }
+sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+ordering-food-database-infrastructure-sqlx = { path = "../database-infrastructure-sqlx" }
+time.workspace = true

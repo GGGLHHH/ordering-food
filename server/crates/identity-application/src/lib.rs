@@ -14,8 +14,8 @@ pub use dto::{
 pub use error::ApplicationError;
 pub use module::IdentityModule;
 pub use ports::{
-    Clock, CredentialRepository, IdGenerator, PasswordHasher, RefreshTokenStore, TokenService,
-    TransactionContext, TransactionManager, UserQueryService, UserReadRepository, UserRepository,
+    Clock, IdGenerator, IdentityUnitOfWork, IdentityUnitOfWorkFactory, PasswordHasher,
+    RefreshTokenStore, TokenService, UserQueryService, UserReadRepository,
 };
 pub use use_cases::{
     BindUserIdentity, BindUserIdentityInput, CreateUser, CreateUserIdentityInput, CreateUserInput,

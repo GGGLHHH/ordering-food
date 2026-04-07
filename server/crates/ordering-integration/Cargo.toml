@@ -1,0 +1,14 @@
+[package]
+name = "ordering-food-ordering-integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ordering-food-ordering-application = { path = "../ordering-application" }
+ordering-food-ordering-domain = { path = "../ordering-domain" }
+ordering-food-ordering-infrastructure-sqlx = { path = "../ordering-infrastructure-sqlx" }
+ordering-food-platform-kernel = { path = "../platform-kernel" }
+sqlx.workspace = true
+uuid.workspace = true

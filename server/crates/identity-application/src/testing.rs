@@ -1,53 +1,14 @@
 use crate::{
-    ApplicationError, Clock, TransactionContext, TransactionManager, UserReadModel,
-    UserReadRepository, UserRepository,
+    ApplicationError, Clock, IdentityUnitOfWork, IdentityUnitOfWorkFactory, StoredCredential,
+    UserIdentityReadModel, UserProfileReadModel, UserReadModel, UserReadRepository,
 };
 use async_trait::async_trait;
 use ordering_food_identity_domain::{IdentityType, NormalizedIdentifier, User, UserId};
 use ordering_food_shared_kernel::{Identifier, Timestamp};
 use std::{
-    any::Any,
     collections::HashMap,
-    sync::{Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard},
 };
-
-#[derive(Default)]
-pub struct FakeTransactionContext;
-
-impl TransactionContext for FakeTransactionContext {
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-        self
-    }
-}
-
-#[derive(Default)]
-pub struct FakeTransactionManager {
-    pub begin_count: Mutex<u32>,
-    pub commit_count: Mutex<u32>,
-    pub rollback_count: Mutex<u32>,
-}
-
-#[async_trait]
-impl TransactionManager for FakeTransactionManager {
-    async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
-        *self.begin_count.lock().unwrap() += 1;
-        Ok(Box::new(FakeTransactionContext))
-    }
-
-    async fn commit(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        *self.commit_count.lock().unwrap() += 1;
-        Ok(())
-    }
-
-    async fn rollback(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        *self.rollback_count.lock().unwrap() += 1;
-        Ok(())
-    }
-}
 
 pub struct FakeClock {
     pub now: Timestamp,
@@ -60,43 +21,112 @@ impl Clock for FakeClock {
 }
 
 #[derive(Default)]
-pub struct FakeRepository {
+pub struct FakeIdentityStore {
     users: Mutex<HashMap<String, User>>,
+    credentials: Mutex<HashMap<String, StoredCredential>>,
+    fail_credential_upsert: Mutex<bool>,
 }
 
-impl FakeRepository {
-    pub fn seed(&self, user: User) {
+impl FakeIdentityStore {
+    pub fn seed_user(&self, user: User) {
         self.users
             .lock()
             .unwrap()
             .insert(user.id().as_str().to_string(), user);
     }
 
+    pub fn seed_credential(&self, credential: StoredCredential) {
+        self.credentials
+            .lock()
+            .unwrap()
+            .insert(credential.user_id.clone(), credential);
+    }
+
+    pub fn fail_on_credential_upsert(&self) {
+        *self.fail_credential_upsert.lock().unwrap() = true;
+    }
+
     pub fn users(&self) -> MutexGuard<'_, HashMap<String, User>> {
         self.users.lock().unwrap()
+    }
+
+    pub fn credentials(&self) -> MutexGuard<'_, HashMap<String, StoredCredential>> {
+        self.credentials.lock().unwrap()
     }
 }
 
 #[async_trait]
-impl UserRepository for FakeRepository {
-    async fn find_by_id(
-        &self,
-        _tx: &mut dyn TransactionContext,
+impl UserReadRepository for FakeIdentityStore {
+    async fn get_by_id(&self, user_id: &UserId) -> Result<Option<UserReadModel>, ApplicationError> {
+        Ok(self
+            .users
+            .lock()
+            .unwrap()
+            .get(user_id.as_str())
+            .map(map_user_to_read_model))
+    }
+}
+
+pub struct FakeIdentityUnitOfWorkFactory {
+    store: Arc<FakeIdentityStore>,
+    pub begin_count: Arc<Mutex<u32>>,
+    pub commit_count: Arc<Mutex<u32>>,
+    pub rollback_count: Arc<Mutex<u32>>,
+}
+
+impl FakeIdentityUnitOfWorkFactory {
+    pub fn new(store: Arc<FakeIdentityStore>) -> Self {
+        Self {
+            store,
+            begin_count: Arc::new(Mutex::new(0)),
+            commit_count: Arc::new(Mutex::new(0)),
+            rollback_count: Arc::new(Mutex::new(0)),
+        }
+    }
+}
+
+#[async_trait]
+impl IdentityUnitOfWorkFactory for FakeIdentityUnitOfWorkFactory {
+    async fn begin(&self) -> Result<Box<dyn IdentityUnitOfWork>, ApplicationError> {
+        *self.begin_count.lock().unwrap() += 1;
+
+        let users = self.store.users.lock().unwrap().clone();
+        let credentials = self.store.credentials.lock().unwrap().clone();
+
+        Ok(Box::new(FakeIdentityUnitOfWork {
+            store: self.store.clone(),
+            users,
+            credentials,
+            commit_count: self.commit_count.clone(),
+            rollback_count: self.rollback_count.clone(),
+        }))
+    }
+}
+
+struct FakeIdentityUnitOfWork {
+    store: Arc<FakeIdentityStore>,
+    users: HashMap<String, User>,
+    credentials: HashMap<String, StoredCredential>,
+    commit_count: Arc<Mutex<u32>>,
+    rollback_count: Arc<Mutex<u32>>,
+}
+
+#[async_trait]
+impl IdentityUnitOfWork for FakeIdentityUnitOfWork {
+    async fn find_user_by_id(
+        &mut self,
         user_id: &UserId,
     ) -> Result<Option<User>, ApplicationError> {
-        Ok(self.users.lock().unwrap().get(user_id.as_str()).cloned())
+        Ok(self.users.get(user_id.as_str()).cloned())
     }
 
-    async fn find_by_identity(
-        &self,
-        _tx: &mut dyn TransactionContext,
+    async fn find_user_by_identity(
+        &mut self,
         identity_type: &IdentityType,
         identifier: &NormalizedIdentifier,
     ) -> Result<Option<User>, ApplicationError> {
         Ok(self
             .users
-            .lock()
-            .unwrap()
             .values()
             .find(|user| {
                 user.identities().iter().any(|identity| {
@@ -107,37 +137,94 @@ impl UserRepository for FakeRepository {
             .cloned())
     }
 
-    async fn insert(
-        &self,
-        _tx: &mut dyn TransactionContext,
-        user: &User,
-    ) -> Result<(), ApplicationError> {
+    async fn insert_user(&mut self, user: &User) -> Result<(), ApplicationError> {
         self.users
-            .lock()
-            .unwrap()
             .insert(user.id().as_str().to_string(), user.clone());
         Ok(())
     }
 
-    async fn update(
-        &self,
-        _tx: &mut dyn TransactionContext,
-        user: &User,
-    ) -> Result<(), ApplicationError> {
+    async fn update_user(&mut self, user: &User) -> Result<(), ApplicationError> {
+        if !self.users.contains_key(user.id().as_str()) {
+            return Err(ApplicationError::not_found("user was not found"));
+        }
+
         self.users
-            .lock()
-            .unwrap()
             .insert(user.id().as_str().to_string(), user.clone());
+        Ok(())
+    }
+
+    async fn find_credential_by_user_id(
+        &mut self,
+        user_id: &UserId,
+    ) -> Result<Option<StoredCredential>, ApplicationError> {
+        Ok(self.credentials.get(user_id.as_str()).cloned())
+    }
+
+    async fn upsert_credential(
+        &mut self,
+        user_id: &UserId,
+        password_hash: &str,
+        now: Timestamp,
+    ) -> Result<(), ApplicationError> {
+        if *self.store.fail_credential_upsert.lock().unwrap() {
+            return Err(ApplicationError::unexpected("credential upsert failed"));
+        }
+
+        self.credentials.insert(
+            user_id.as_str().to_string(),
+            StoredCredential {
+                user_id: user_id.as_str().to_string(),
+                password_hash: password_hash.to_string(),
+                created_at: now,
+                updated_at: now,
+            },
+        );
+        Ok(())
+    }
+
+    async fn commit(self: Box<Self>) -> Result<(), ApplicationError> {
+        let Self {
+            store,
+            users,
+            credentials,
+            commit_count,
+            ..
+        } = *self;
+
+        *commit_count.lock().unwrap() += 1;
+        *store.users.lock().unwrap() = users;
+        *store.credentials.lock().unwrap() = credentials;
+        Ok(())
+    }
+
+    async fn rollback(self: Box<Self>) -> Result<(), ApplicationError> {
+        let Self { rollback_count, .. } = *self;
+        *rollback_count.lock().unwrap() += 1;
         Ok(())
     }
 }
 
-#[async_trait]
-impl UserReadRepository for FakeRepository {
-    async fn get_by_id(
-        &self,
-        _user_id: &UserId,
-    ) -> Result<Option<UserReadModel>, ApplicationError> {
-        Ok(None)
+fn map_user_to_read_model(user: &User) -> UserReadModel {
+    UserReadModel {
+        user_id: user.id().as_str().to_string(),
+        status: user.status().as_str().to_string(),
+        profile: UserProfileReadModel {
+            display_name: user.profile().display_name().to_string(),
+            given_name: user.profile().given_name().map(ToOwned::to_owned),
+            family_name: user.profile().family_name().map(ToOwned::to_owned),
+            avatar_url: user.profile().avatar_url().map(ToOwned::to_owned),
+        },
+        identities: user
+            .identities()
+            .iter()
+            .map(|identity| UserIdentityReadModel {
+                identity_type: identity.identity_type().as_str().to_string(),
+                identifier_normalized: identity.identifier_normalized().as_str().to_string(),
+                bound_at: identity.bound_at(),
+            })
+            .collect(),
+        created_at: user.created_at(),
+        updated_at: user.updated_at(),
+        deleted_at: user.deleted_at(),
     }
 }

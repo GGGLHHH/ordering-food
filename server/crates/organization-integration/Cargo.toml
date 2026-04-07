@@ -1,0 +1,17 @@
+[package]
+name = "ordering-food-organization-integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+ordering-food-organization-application = { path = "../organization-application" }
+ordering-food-organization-domain = { path = "../organization-domain" }
+ordering-food-organization-infrastructure-sqlx = { path = "../organization-infrastructure-sqlx" }
+ordering-food-organization-published = { path = "../organization-published" }
+ordering-food-platform-kernel = { path = "../platform-kernel" }
+sqlx.workspace = true
+tracing.workspace = true
+uuid = { workspace = true, features = ["v4"] }
