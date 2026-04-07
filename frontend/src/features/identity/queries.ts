@@ -3,6 +3,7 @@ import { mutationOptions, queryOptions, useMutation } from '@tanstack/react-quer
 import type {
   BindIdentityUserIdentityRequest,
   CreateIdentityUserRequest,
+  IdentityUserPath,
   UpdateIdentityUserProfileRequest,
 } from '#/contracts/openapi/types'
 
@@ -21,40 +22,40 @@ export const identityKeys = {
 }
 
 export const identityQueries = {
-  detail: (userId: string) =>
+  detail: (path: IdentityUserPath) =>
     queryOptions({
-      queryFn: ({ signal }) => getIdentityUser(userId, signal),
-      queryKey: identityKeys.detail(userId),
+      queryFn: ({ signal }) => getIdentityUser(path, signal),
+      queryKey: identityKeys.detail(path.user_id),
     }),
 }
 
 export const identityMutations = {
-  bindIdentity: (userId: string) =>
+  bindIdentity: (path: IdentityUserPath) =>
     mutationOptions({
       mutationFn: (payload: BindIdentityUserIdentityRequest) =>
-        bindIdentityUserIdentity(userId, payload),
-      mutationKey: [...identityKeys.all, 'bindIdentity', userId] as const,
+        bindIdentityUserIdentity(path, payload),
+      mutationKey: [...identityKeys.all, 'bindIdentity', path.user_id] as const,
     }),
   create: () =>
     mutationOptions({
       mutationFn: (payload: CreateIdentityUserRequest) => createIdentityUser(payload),
       mutationKey: [...identityKeys.all, 'create'] as const,
     }),
-  disable: (userId: string) =>
+  disable: (path: IdentityUserPath) =>
     mutationOptions({
-      mutationFn: () => disableIdentityUser(userId),
-      mutationKey: [...identityKeys.all, 'disable', userId] as const,
+      mutationFn: () => disableIdentityUser(path),
+      mutationKey: [...identityKeys.all, 'disable', path.user_id] as const,
     }),
-  softDelete: (userId: string) =>
+  softDelete: (path: IdentityUserPath) =>
     mutationOptions({
-      mutationFn: () => softDeleteIdentityUser(userId),
-      mutationKey: [...identityKeys.all, 'softDelete', userId] as const,
+      mutationFn: () => softDeleteIdentityUser(path),
+      mutationKey: [...identityKeys.all, 'softDelete', path.user_id] as const,
     }),
-  updateProfile: (userId: string) =>
+  updateProfile: (path: IdentityUserPath) =>
     mutationOptions({
       mutationFn: (payload: UpdateIdentityUserProfileRequest) =>
-        updateIdentityUserProfile(userId, payload),
-      mutationKey: [...identityKeys.all, 'updateProfile', userId] as const,
+        updateIdentityUserProfile(path, payload),
+      mutationKey: [...identityKeys.all, 'updateProfile', path.user_id] as const,
     }),
 }
 

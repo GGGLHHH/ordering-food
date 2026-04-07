@@ -93,7 +93,7 @@ describe('order query integration', () => {
 })
 
 function OrderQueryProbe() {
-  const query = useOrderQuery('order-1')
+  const query = useOrderQuery({ order_id: 'order-1' })
   return <p>{query.data?.status ?? 'loading'}</p>
 }
 

@@ -9,7 +9,7 @@ interface OrderPageProps {
 }
 
 export function OrderPage({ orderId }: OrderPageProps) {
-  const orderQuery = useOrderQuery(orderId)
+  const orderQuery = useOrderQuery({ order_id: orderId })
   const order = orderQuery.data
   const statusSteps = [
     'pending_acceptance',

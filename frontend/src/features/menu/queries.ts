@@ -1,5 +1,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 
+import type { MenuItemPath } from '#/contracts/openapi/types'
+
 import { getMenuCategories, getMenuItem, getMenuItems, getMenuStore } from './api'
 
 export const menuKeys = {
@@ -37,10 +39,10 @@ export const menuQueries = {
       queryKey: menuKeys.items(categorySlug),
       staleTime: 30_000,
     }),
-  item: (itemId: string) =>
+  item: (path: MenuItemPath) =>
     queryOptions({
-      queryFn: ({ signal }) => getMenuItem(itemId, signal),
-      queryKey: menuKeys.item(itemId),
+      queryFn: ({ signal }) => getMenuItem(path, signal),
+      queryKey: menuKeys.item(path.item_id),
       staleTime: 30_000,
     }),
 }
@@ -57,9 +59,9 @@ export function useMenuItemsQuery(categorySlug?: string) {
   return useQuery(menuQueries.items(categorySlug))
 }
 
-export function useMenuItemQuery(itemId: string) {
+export function useMenuItemQuery(path: MenuItemPath) {
   return useQuery({
-    ...menuQueries.item(itemId),
-    enabled: itemId.trim().length > 0,
+    ...menuQueries.item(path),
+    enabled: path.item_id.trim().length > 0,
   })
 }

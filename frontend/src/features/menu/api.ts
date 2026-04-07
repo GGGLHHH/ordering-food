@@ -6,6 +6,7 @@ import {
 } from '#/contracts/openapi/helpers'
 import type {
   MenuCategoriesResponse,
+  MenuItemPath,
   MenuItemResponse,
   MenuItemsQuery,
   MenuItemsResponse,
@@ -38,8 +39,8 @@ export function getMenuItems(query: MenuItemsQuery = {}, signal?: AbortSignal) {
   })
 }
 
-export function getMenuItem(itemId: string, signal?: AbortSignal) {
-  return requestJson<MenuItemResponse>(catalogItemPath(itemId), {
+export function getMenuItem(path: MenuItemPath, signal?: AbortSignal) {
+  return requestJson<MenuItemResponse>(catalogItemPath(path.item_id), {
     authMode: 'none',
     method: 'GET',
     signal,

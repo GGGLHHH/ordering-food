@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
-import type { PlaceOrderRequest } from '#/contracts/openapi/types'
+import type { OrderPath, PlaceOrderRequest } from '#/contracts/openapi/types'
 
 import { getOrder, listOrders, placeOrder } from './api'
 
@@ -23,11 +23,11 @@ export const orderQueries = {
       queryKey: orderKeys.list(),
       staleTime: 5_000,
     }),
-  detail: (orderId: string) =>
+  detail: (path: OrderPath) =>
     queryOptions({
-      enabled: orderId.trim().length > 0,
-      queryFn: ({ signal }) => getOrder(orderId, signal),
-      queryKey: orderKeys.detail(orderId),
+      enabled: path.order_id.trim().length > 0,
+      queryFn: ({ signal }) => getOrder(path, signal),
+      queryKey: orderKeys.detail(path.order_id),
       staleTime: 5_000,
     }),
 }
@@ -40,8 +40,8 @@ export const orderMutations = {
     }),
 }
 
-export function useOrderQuery(orderId: string) {
-  return useQuery(orderQueries.detail(orderId))
+export function useOrderQuery(path: OrderPath) {
+  return useQuery(orderQueries.detail(path))
 }
 
 export function useOrdersQuery() {
