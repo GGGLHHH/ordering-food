@@ -95,6 +95,105 @@ describe('vite-plugin-openapi-codegen', () => {
     expectValidTypeScript(files.types, 'types.ts')
   })
 
+  it('supports custom pathPrefix for filtering and stripping', () => {
+    const spec = {
+      components: {
+        schemas: {
+          Item: { properties: { id: { type: 'string' } }, type: 'object' },
+        },
+      },
+      paths: {
+        '/v1/items': {
+          get: {
+            operationId: 'list_items',
+            responses: { 200: { description: 'OK' } },
+            tags: ['items'],
+          },
+        },
+        '/api/ignored': {
+          get: {
+            operationId: 'ignored',
+            responses: { 200: { description: 'OK' } },
+            tags: ['other'],
+          },
+        },
+      },
+    }
+
+    const files = renderGeneratedArtifacts(spec, { pathPrefix: '/v1/' })
+    const normalizedApi = normalizeGeneratedSource(files.api)
+
+    expect(normalizedApi).toContain('export function getItems(): string {')
+    expect(normalizedApi).toContain("return 'items'")
+    expect(normalizedApi).not.toContain('ignored')
+    expectValidTypeScript(files.api, 'api.ts')
+  })
+
+  it('supports custom httpClient configuration', () => {
+    const files = renderGeneratedArtifacts(createSpec(), {
+      httpClient: {
+        module: '@app/http',
+        jsonFunction: 'fetchJson',
+        voidFunction: 'fetchVoid',
+        requestOptionsType: 'RequestConfig',
+        omitKeys: ['body', 'method'],
+      },
+    })
+    const normalizedClient = normalizeGeneratedSource(files.client)
+
+    expect(normalizedClient).toContain("import type { RequestConfig } from '@app/http'")
+    expect(normalizedClient).toContain("import { fetchJson, fetchVoid } from '@app/http'")
+    expect(normalizedClient).toContain("Omit<RequestConfig, 'body' | 'method'>")
+    expect(normalizedClient).toContain('return fetchJson<')
+    expect(normalizedClient).toContain('return fetchVoid(')
+    expect(normalizedClient).not.toContain('requestJson')
+    expect(normalizedClient).not.toContain('requestVoid')
+    expect(normalizedClient).not.toContain('ApiRequestOptions')
+    expect(normalizedClient).not.toContain('#/integrations/http')
+    expectValidTypeScript(files.client, 'client.ts')
+  })
+
+  it('retains full path when stripPrefix is false', () => {
+    const files = renderGeneratedArtifacts(createSpec(), { stripPrefix: false })
+    const normalizedApi = normalizeGeneratedSource(files.api)
+
+    expect(normalizedApi).toContain("return '/api/auth/login'")
+    expect(normalizedApi).toContain('return `/api/catalog/items/${params.item_id}`')
+    expectValidTypeScript(files.api, 'api.ts')
+  })
+
+  it('generates RuntimeRequestOptions without Omit when omitKeys is empty', () => {
+    const files = renderGeneratedArtifacts(createSpec(), {
+      httpClient: { omitKeys: [] },
+    })
+    const normalizedClient = normalizeGeneratedSource(files.client)
+
+    expect(normalizedClient).toContain('type RuntimeRequestOptions = ApiRequestOptions')
+    expect(normalizedClient).not.toContain('Omit<')
+    expectValidTypeScript(files.client, 'client.ts')
+  })
+
+  it('throws with custom pathPrefix in error message when no paths match', () => {
+    const spec = {
+      components: {
+        schemas: { Item: { properties: { id: { type: 'string' } }, type: 'object' } },
+      },
+      paths: {
+        '/api/items': {
+          get: {
+            operationId: 'list_items',
+            responses: { 200: { description: 'OK' } },
+            tags: ['items'],
+          },
+        },
+      },
+    }
+
+    expect(() => renderGeneratedArtifacts(spec, { pathPrefix: '/v2/' })).toThrow(
+      'No paths matching prefix "/v2/" found',
+    )
+  })
+
   it('maintains proper module boundaries', () => {
     const pluginSourceText = readFileSync(
       resolve(import.meta.dirname, './vite-plugin-openapi-codegen.ts'),
@@ -112,6 +211,9 @@ describe('vite-plugin-openapi-codegen', () => {
     // Plugin entry imports from ast and normalization directly
     expect(pluginSourceText).toContain("from './openapi-codegen-ast.ts'")
     expect(pluginSourceText).toContain("from './openapi-codegen-normalization.ts'")
+
+    // Plugin entry exports HttpClientConfig
+    expect(pluginSourceText).toContain('export interface HttpClientConfig')
 
     // Plugin entry does NOT contain AST internals
     expect(pluginSourceText).not.toContain("import * as ts from 'typescript'")

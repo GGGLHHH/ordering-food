@@ -23,7 +23,7 @@ interface AstClientOperation {
   pathChannel: NormalizedChannel
   pathInvocationExpr: string
   queryChannel: NormalizedChannel
-  requestFunction: 'requestJson' | 'requestVoid'
+  requestFunction: string
   responseTypeExpr: string | null
   returnTypeExpr: string
 }
@@ -32,6 +32,14 @@ interface AstClientRenderModel {
   needsSearchParamsHelper: boolean
   operations: AstClientOperation[]
   typeImports: string[]
+}
+
+interface AstHttpClientConfig {
+  jsonFunction: string
+  module: string
+  omitKeys: string[]
+  requestOptionsType: string
+  voidFunction: string
 }
 
 export function renderTypesSource(
@@ -143,10 +151,14 @@ export function renderApiSource(
 export function renderClientSource(
   model: AstClientRenderModel,
   generatedHeader: readonly string[],
+  httpClient: AstHttpClientConfig,
 ): string {
   const statements: ts.Statement[] = [
-    createTypeOnlyImport(['ApiRequestOptions'], '#/integrations/http'),
-    createValueImport([{ name: 'requestJson' }, { name: 'requestVoid' }], '#/integrations/http'),
+    createTypeOnlyImport([httpClient.requestOptionsType], httpClient.module),
+    createValueImport(
+      [{ name: httpClient.jsonFunction }, { name: httpClient.voidFunction }],
+      httpClient.module,
+    ),
     createTypeOnlyImport(['operations'], './api-types'),
   ]
 
@@ -164,14 +176,17 @@ export function renderClientSource(
     ),
   )
 
+  const runtimeTypeExpr =
+    httpClient.omitKeys.length > 0
+      ? `Omit<${httpClient.requestOptionsType}, ${httpClient.omitKeys.map((k) => `'${k}'`).join(' | ')}>`
+      : httpClient.requestOptionsType
+
   statements.push(
     ts.factory.createTypeAliasDeclaration(
       undefined,
       ts.factory.createIdentifier('RuntimeRequestOptions'),
       undefined,
-      createTypeNodeFromText(
-        "Omit<ApiRequestOptions, 'json' | 'method' | 'searchParams' | 'signal'>",
-      ),
+      createTypeNodeFromText(runtimeTypeExpr),
     ),
   )
 

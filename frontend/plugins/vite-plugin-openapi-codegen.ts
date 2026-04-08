@@ -15,11 +15,42 @@ import {
   warnOnParameterLocationMismatch,
 } from './openapi-codegen-normalization.ts'
 
+export interface HttpClientConfig {
+  /** HTTP module import path. Default: '#/integrations/http' */
+  module?: string
+  /** Function name for JSON-returning requests. Default: 'requestJson' */
+  jsonFunction?: string
+  /** Function name for void requests. Default: 'requestVoid' */
+  voidFunction?: string
+  /** Type name for request options (type-only import). Default: 'ApiRequestOptions' */
+  requestOptionsType?: string
+  /** Keys to Omit from requestOptionsType for RuntimeRequestOptions. Default: ['json','method','searchParams','signal'] */
+  omitKeys?: string[]
+}
+
+const HTTP_CLIENT_DEFAULTS: Required<HttpClientConfig> = {
+  module: '#/integrations/http',
+  jsonFunction: 'requestJson',
+  voidFunction: 'requestVoid',
+  requestOptionsType: 'ApiRequestOptions',
+  omitKeys: ['json', 'method', 'searchParams', 'signal'],
+}
+
+function resolveHttpClientConfig(config?: HttpClientConfig): Required<HttpClientConfig> {
+  return { ...HTTP_CLIENT_DEFAULTS, ...config }
+}
+
 export interface Options {
   /** Path to openapi.json (relative to project root) */
   input: string
   /** Output directory for generated files (relative to project root) */
   output: string
+  /** Path prefix for filtering and stripping. Default: '/api/' */
+  pathPrefix?: string
+  /** Whether to strip pathPrefix from generated paths. Default: true */
+  stripPrefix?: boolean
+  /** HTTP client configuration */
+  httpClient?: HttpClientConfig
   /** Legacy type aliases for types.ts: { OldName: 'NewName' } */
   legacyAliases?: Record<string, string>
 }
@@ -78,7 +109,7 @@ function createClientRenderModel(model: {
     pathChannel: NormalizedChannel
     pathInvocationExpr: string
     queryChannel: NormalizedChannel
-    requestFunction: 'requestJson' | 'requestVoid'
+    requestFunction: string
     responseTypeExpr: string | null
     returnTypeExpr: string
   }>
@@ -106,18 +137,24 @@ function createClientRenderModel(model: {
 
 export function renderGeneratedArtifacts(
   spec: OpenAPISpec,
-  options: Pick<Options, 'legacyAliases'>,
+  options: Pick<Options, 'httpClient' | 'legacyAliases' | 'pathPrefix' | 'stripPrefix'>,
   preCollectedOperations?: OperationEntry[],
 ): GeneratedArtifacts {
-  const operations = preCollectedOperations ?? collectOperations(spec)
-  const clientModel = buildClientRenderModelFromOperations(operations, spec)
+  const pathPrefix = options.pathPrefix ?? '/api/'
+  const stripPrefix = options.stripPrefix ?? true
+  const httpClient = resolveHttpClientConfig(options.httpClient)
+  const operations = preCollectedOperations ?? collectOperations(spec, pathPrefix, stripPrefix)
+  const clientModel = buildClientRenderModelFromOperations(operations, spec, {
+    json: httpClient.jsonFunction,
+    void: httpClient.voidFunction,
+  })
   if (clientModel.operations.length === 0) {
-    throw new Error('No /api/ paths found in openapi.json')
+    throw new Error(`No paths matching prefix "${pathPrefix}" found in openapi.json`)
   }
 
   return {
     api: renderApiSource(createApiEntries(clientModel.operations), GENERATED_HEADER),
-    client: renderClientSource(createClientRenderModel(clientModel), GENERATED_HEADER),
+    client: renderClientSource(createClientRenderModel(clientModel), GENERATED_HEADER, httpClient),
     types: renderTypesBarrel(spec, options.legacyAliases),
   }
 }
@@ -126,7 +163,9 @@ async function generate(root: string, options: Options): Promise<void> {
   const inputPath = resolve(root, options.input)
   const outputDir = resolve(root, options.output)
   const spec = JSON.parse(readFileSync(inputPath, 'utf-8')) as OpenAPISpec
-  const operations = collectOperations(spec)
+  const pathPrefix = options.pathPrefix ?? '/api/'
+  const stripPrefix = options.stripPrefix ?? true
+  const operations = collectOperations(spec, pathPrefix, stripPrefix)
   const artifacts = renderGeneratedArtifacts(spec, options, operations)
 
   warnOnParameterLocationMismatch(operations)

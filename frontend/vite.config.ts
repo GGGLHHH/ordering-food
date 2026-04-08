@@ -85,6 +85,15 @@ const config = defineConfig({
     openapiCodegen({
       input: 'src/contracts/openapi/openapi.json',
       output: 'src/contracts/openapi',
+      pathPrefix: '/api/',
+      stripPrefix: true,
+      httpClient: {
+        module: '#/integrations/http',
+        jsonFunction: 'requestJson',
+        voidFunction: 'requestVoid',
+        requestOptionsType: 'ApiRequestOptions',
+        omitKeys: ['json', 'method', 'searchParams', 'signal'],
+      },
       legacyAliases: {
         MenuStoreResponse: 'CatalogStoreCatalogResponse',
         MenuCategoriesResponse: 'CatalogCategoriesResponse',

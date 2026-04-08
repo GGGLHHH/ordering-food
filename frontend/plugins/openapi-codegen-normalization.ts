@@ -70,7 +70,7 @@ export interface NormalizedOperation {
   pathChannel: NormalizedChannel
   pathInvocationExpr: string
   queryChannel: NormalizedChannel
-  requestFunction: 'requestJson' | 'requestVoid'
+  requestFunction: string
   responseTypeExpr: string | null
   returnTypeExpr: string
 }
@@ -91,27 +91,19 @@ interface SuccessResponseInfo {
   statusKey: string
 }
 
-export function buildClientRenderModel(spec: OpenAPISpec): ClientRenderModel {
-  const context = buildNormalizationContext(spec)
-  const typeImports = new Set<string>()
-  const operations = collectOperations(spec).map((entry) =>
-    normalizeOperation(entry, context, typeImports),
-  )
-
-  return {
-    operations,
-    needsSearchParamsHelper: operations.some((operation) => operation.queryChannel.present),
-    typeImports: [...typeImports].sort(),
-  }
-}
-
 export function buildClientRenderModelFromOperations(
   operations: OperationEntry[],
   spec: OpenAPISpec,
+  requestFunctionNames: { json: string; void: string } = {
+    json: 'requestJson',
+    void: 'requestVoid',
+  },
 ): ClientRenderModel {
   const context = buildNormalizationContext(spec)
   const typeImports = new Set<string>()
-  const normalized = operations.map((entry) => normalizeOperation(entry, context, typeImports))
+  const normalized = operations.map((entry) =>
+    normalizeOperation(entry, context, typeImports, requestFunctionNames),
+  )
 
   return {
     operations: normalized,
@@ -120,13 +112,17 @@ export function buildClientRenderModelFromOperations(
   }
 }
 
-export function collectOperations(spec: OpenAPISpec): OperationEntry[] {
+export function collectOperations(
+  spec: OpenAPISpec,
+  pathPrefix = '/api/',
+  stripPrefix = true,
+): OperationEntry[] {
   const apiPaths = Object.keys(spec.paths ?? {})
-    .filter((path) => path.startsWith('/api/'))
+    .filter((path) => path.startsWith(pathPrefix))
     .sort()
 
   if (apiPaths.length === 0) {
-    throw new Error('No /api/ paths found in openapi.json')
+    throw new Error(`No paths matching prefix "${pathPrefix}" found in openapi.json`)
   }
 
   const entries: OperationEntry[] = []
@@ -139,10 +135,10 @@ export function collectOperations(spec: OpenAPISpec): OperationEntry[] {
       const operation = pathItem[method]
       if (!operation?.operationId) continue
 
-      const strippedPath = apiPath.replace('/api/', '')
+      const strippedPath = stripPrefix ? apiPath.replace(pathPrefix, '') : apiPath
       entries.push({
         apiPath,
-        funcName: makeFuncName(method, apiPath),
+        funcName: makeFuncName(method, apiPath, pathPrefix),
         group: strippedPath.split('/')[0] ?? 'misc',
         method,
         operation,
@@ -271,8 +267,8 @@ function getClientOptionTypeName(funcName: string): string {
   return `${capitalize(funcName)}Options`
 }
 
-function makeFuncName(method: HttpMethod, apiPath: string): string {
-  const segments = apiPath.replace('/api/', '').split('/')
+function makeFuncName(method: HttpMethod, apiPath: string, pathPrefix = '/api/'): string {
+  const segments = apiPath.replace(pathPrefix, '').split('/')
   const result: string[] = []
 
   for (const segment of segments) {
@@ -349,6 +345,7 @@ function normalizeOperation(
   entry: OperationEntry,
   context: NormalizationContext,
   typeImports: Set<string>,
+  requestFunctionNames: { json: string; void: string },
 ): NormalizedOperation {
   const successResponse = getSuccessResponseInfo(entry.operation)
   const builderAlias = getBuilderAlias(entry.funcName)
@@ -370,7 +367,7 @@ function normalizeOperation(
     pathChannel,
     pathInvocationExpr: pathChannel.present ? `${builderAlias}(options.path)` : `${builderAlias}()`,
     queryChannel,
-    requestFunction: responseTypeExpr ? 'requestJson' : 'requestVoid',
+    requestFunction: responseTypeExpr ? requestFunctionNames.json : requestFunctionNames.void,
     responseTypeExpr,
     returnTypeExpr: responseTypeExpr ? `Promise<${responseTypeExpr}>` : 'Promise<void>',
   }
