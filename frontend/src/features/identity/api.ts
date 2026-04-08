@@ -5,31 +5,36 @@ import {
   postIdentityUserIdentities,
   postIdentityUserSoftDelete,
   postIdentityUsers,
-} from '#/contracts/openapi/api'
+} from '#/contracts/openapi/client'
 import type {
   BindIdentityUserIdentityRequest,
   CreateIdentityUserRequest,
   IdentityUserPath,
-  IdentityUserResponse,
   UpdateIdentityUserProfileRequest,
 } from '#/contracts/openapi/types'
-import { requestJson } from '#/integrations/http'
 
 export function createIdentityUser(payload: CreateIdentityUserRequest, signal?: AbortSignal) {
-  return requestJson<IdentityUserResponse>(postIdentityUsers(), {
-    authMode: 'none',
-    json: payload,
-    method: 'POST',
-    signal,
-  })
+  return postIdentityUsers(
+    {
+      body: payload,
+      signal,
+    },
+    {
+      authMode: 'none',
+    },
+  )
 }
 
 export function fetchIdentityUser(path: IdentityUserPath, signal?: AbortSignal) {
-  return requestJson<IdentityUserResponse>(getIdentityUser({ user_id: path.user_id }), {
-    authMode: 'none',
-    method: 'GET',
-    signal,
-  })
+  return getIdentityUser(
+    {
+      path,
+      signal,
+    },
+    {
+      authMode: 'none',
+    },
+  )
 }
 
 export function updateIdentityUserProfile(
@@ -37,12 +42,16 @@ export function updateIdentityUserProfile(
   payload: UpdateIdentityUserProfileRequest,
   signal?: AbortSignal,
 ) {
-  return requestJson<IdentityUserResponse>(patchIdentityUserProfile({ user_id: path.user_id }), {
-    authMode: 'none',
-    json: payload,
-    method: 'PATCH',
-    signal,
-  })
+  return patchIdentityUserProfile(
+    {
+      body: payload,
+      path,
+      signal,
+    },
+    {
+      authMode: 'none',
+    },
+  )
 }
 
 export function bindIdentityUserIdentity(
@@ -50,26 +59,38 @@ export function bindIdentityUserIdentity(
   payload: BindIdentityUserIdentityRequest,
   signal?: AbortSignal,
 ) {
-  return requestJson<IdentityUserResponse>(postIdentityUserIdentities({ user_id: path.user_id }), {
-    authMode: 'none',
-    json: payload,
-    method: 'POST',
-    signal,
-  })
+  return postIdentityUserIdentities(
+    {
+      body: payload,
+      path,
+      signal,
+    },
+    {
+      authMode: 'none',
+    },
+  )
 }
 
 export function disableIdentityUser(path: IdentityUserPath, signal?: AbortSignal) {
-  return requestJson<IdentityUserResponse>(postIdentityUserDisable({ user_id: path.user_id }), {
-    authMode: 'none',
-    method: 'POST',
-    signal,
-  })
+  return postIdentityUserDisable(
+    {
+      path,
+      signal,
+    },
+    {
+      authMode: 'none',
+    },
+  )
 }
 
 export function softDeleteIdentityUser(path: IdentityUserPath, signal?: AbortSignal) {
-  return requestJson<IdentityUserResponse>(postIdentityUserSoftDelete({ user_id: path.user_id }), {
-    authMode: 'none',
-    method: 'POST',
-    signal,
-  })
+  return postIdentityUserSoftDelete(
+    {
+      path,
+      signal,
+    },
+    {
+      authMode: 'none',
+    },
+  )
 }

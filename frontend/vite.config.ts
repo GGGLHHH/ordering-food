@@ -16,7 +16,10 @@ const config = defineConfig({
     ignorePatterns: [
       'src/routeTree.gen.ts',
       'src/contracts/generated/**',
+      'src/contracts/openapi/api.ts',
       'src/contracts/openapi/api-types.d.ts',
+      'src/contracts/openapi/client.ts',
+      'src/contracts/openapi/types.ts',
       '*.md',
     ],
     rules: {
@@ -62,7 +65,10 @@ const config = defineConfig({
     ignorePatterns: [
       'src/routeTree.gen.ts',
       'src/contracts/generated/**',
+      'src/contracts/openapi/api.ts',
       'src/contracts/openapi/api-types.d.ts',
+      'src/contracts/openapi/client.ts',
+      'src/contracts/openapi/types.ts',
       '*.md',
     ],
     sortImports: {
