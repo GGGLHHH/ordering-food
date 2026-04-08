@@ -1,3 +1,4 @@
+import { getAuthMe, postAuthLogin, postAuthLogout } from '#/contracts/openapi/api'
 import type { AuthMeResponse, AuthResponse, LoginRequest } from '#/contracts/openapi/types'
 import { type AuthMode, requestJson, requestVoid } from '#/integrations/http'
 
@@ -7,7 +8,7 @@ interface AuthApiOptions {
 }
 
 export function login(payload: LoginRequest, signal?: AbortSignal) {
-  return requestJson<AuthResponse>('auth/login', {
+  return requestJson<AuthResponse>(postAuthLogin(), {
     authMode: 'none',
     json: payload,
     method: 'POST',
@@ -16,7 +17,7 @@ export function login(payload: LoginRequest, signal?: AbortSignal) {
 }
 
 export function logout(signal?: AbortSignal) {
-  return requestVoid('auth/logout', {
+  return requestVoid(postAuthLogout(), {
     authMode: 'none',
     method: 'POST',
     signal,
@@ -24,7 +25,7 @@ export function logout(signal?: AbortSignal) {
 }
 
 export function getCurrentUser(options: AuthApiOptions = {}) {
-  return requestJson<AuthMeResponse>('auth/me', {
+  return requestJson<AuthMeResponse>(getAuthMe(), {
     authMode: options.authMode ?? 'required',
     method: 'GET',
     signal: options.signal,

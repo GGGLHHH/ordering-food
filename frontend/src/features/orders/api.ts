@@ -1,3 +1,4 @@
+import { getOrder as getOrderPath, getOrders, postOrders } from '#/contracts/openapi/api'
 import type {
   OrderListResponse,
   OrderPath,
@@ -7,7 +8,7 @@ import type {
 import { requestJson } from '#/integrations/http'
 
 export function placeOrder(payload: PlaceOrderRequest, signal?: AbortSignal) {
-  return requestJson<OrderResponse>('orders', {
+  return requestJson<OrderResponse>(postOrders(), {
     authMode: 'required',
     json: payload,
     method: 'POST',
@@ -16,7 +17,7 @@ export function placeOrder(payload: PlaceOrderRequest, signal?: AbortSignal) {
 }
 
 export function getOrder(path: OrderPath, signal?: AbortSignal) {
-  return requestJson<OrderResponse>(`orders/${path.order_id}`, {
+  return requestJson<OrderResponse>(getOrderPath({ order_id: path.order_id }), {
     authMode: 'required',
     method: 'GET',
     signal,
@@ -24,7 +25,7 @@ export function getOrder(path: OrderPath, signal?: AbortSignal) {
 }
 
 export function listOrders(signal?: AbortSignal) {
-  return requestJson<OrderListResponse>('orders', {
+  return requestJson<OrderListResponse>(getOrders(), {
     authMode: 'required',
     method: 'GET',
     signal,

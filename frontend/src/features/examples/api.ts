@@ -1,3 +1,4 @@
+import { getExamplesItem, getExamplesSearch, postExamplesEcho } from '#/contracts/openapi/api'
 import type {
   ExampleItemPath,
   ExampleItemResponse,
@@ -9,7 +10,7 @@ import type {
 import { requestJson } from '#/integrations/http'
 
 export function echoExamplePayload(payload: ExamplePayload, signal?: AbortSignal) {
-  return requestJson<ExamplePayloadResponse>('examples/echo', {
+  return requestJson<ExamplePayloadResponse>(postExamplesEcho(), {
     authMode: 'none',
     json: payload,
     method: 'POST',
@@ -18,16 +19,15 @@ export function echoExamplePayload(payload: ExamplePayload, signal?: AbortSignal
 }
 
 export function searchExamples(query: ExampleSearchQuery, signal?: AbortSignal) {
-  return requestJson<ExampleSearchResponse>('examples/search', {
+  return requestJson<ExampleSearchResponse>(getExamplesSearch({ page: query.page }), {
     authMode: 'none',
     method: 'GET',
-    searchParams: { page: String(query.page) },
     signal,
   })
 }
 
 export function getExampleItem(path: ExampleItemPath, signal?: AbortSignal) {
-  return requestJson<ExampleItemResponse>(`examples/items/${path.item_id}`, {
+  return requestJson<ExampleItemResponse>(getExamplesItem({ item_id: path.item_id }), {
     authMode: 'none',
     method: 'GET',
     signal,

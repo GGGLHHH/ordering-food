@@ -5,13 +5,20 @@ import viteReact from '@vitejs/plugin-react'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { defineConfig } from 'vite-plus'
 
+import { openapiCodegen } from './plugins/vite-plugin-openapi-codegen.ts'
+
 const API_PROXY_TARGET = 'http://127.0.0.1:8080'
 
 const config = defineConfig({
   lint: {
     plugins: ['react', 'typescript', 'jsx-a11y'],
     options: { typeAware: true, typeCheck: true },
-    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**', '*.md'],
+    ignorePatterns: [
+      'src/routeTree.gen.ts',
+      'src/contracts/generated/**',
+      'src/contracts/openapi/api-types.d.ts',
+      '*.md',
+    ],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/consistent-type-imports': 'off',
@@ -52,7 +59,12 @@ const config = defineConfig({
     semi: false,
     trailingComma: 'all',
     arrowParens: 'always',
-    ignorePatterns: ['src/routeTree.gen.ts', 'src/contracts/generated/**', '*.md'],
+    ignorePatterns: [
+      'src/routeTree.gen.ts',
+      'src/contracts/generated/**',
+      'src/contracts/openapi/api-types.d.ts',
+      '*.md',
+    ],
     sortImports: {
       internalPattern: ['#/*', '@/*'],
     },
@@ -64,6 +76,19 @@ const config = defineConfig({
     tsconfigPaths: true,
   },
   plugins: [
+    openapiCodegen({
+      input: 'src/contracts/openapi/openapi.json',
+      output: 'src/contracts/openapi',
+      legacyAliases: {
+        MenuStoreResponse: 'CatalogStoreCatalogResponse',
+        MenuCategoriesResponse: 'CatalogCategoriesResponse',
+        MenuCategoryResponse: 'CatalogCategoryResponse',
+        MenuItemPath: 'CatalogItemPath',
+        MenuItemResponse: 'CatalogItemResponse',
+        MenuItemsQuery: 'CatalogItemsQuery',
+        MenuItemsResponse: 'CatalogItemsResponse',
+      },
+    }),
     codeInspectorPlugin({
       bundler: 'vite',
     }),

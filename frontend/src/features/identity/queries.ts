@@ -11,7 +11,7 @@ import {
   bindIdentityUserIdentity,
   createIdentityUser,
   disableIdentityUser,
-  getIdentityUser,
+  fetchIdentityUser,
   softDeleteIdentityUser,
   updateIdentityUserProfile,
 } from './api'
@@ -24,7 +24,7 @@ export const identityKeys = {
 export const identityQueries = {
   detail: (path: IdentityUserPath) =>
     queryOptions({
-      queryFn: ({ signal }) => getIdentityUser(path, signal),
+      queryFn: ({ signal }) => fetchIdentityUser(path, signal),
       queryKey: identityKeys.detail(path.user_id),
     }),
 }
