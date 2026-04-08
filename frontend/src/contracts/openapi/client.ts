@@ -3,31 +3,6 @@
 
 import type { ApiRequestOptions } from '#/integrations/http'
 import { requestJson, requestVoid } from '#/integrations/http'
-import type { operations } from './api-types'
-
-import type {
-  AuthMeResponse,
-  AuthResponse,
-  BindIdentityUserIdentityRequest,
-  CatalogCategoriesResponse,
-  CatalogItemResponse,
-  CatalogItemsQuery,
-  CatalogItemsResponse,
-  CatalogStoreCatalogResponse,
-  CreateIdentityUserRequest,
-  ExampleItemResponse,
-  ExamplePayload,
-  ExamplePayloadResponse,
-  ExampleSearchQuery,
-  ExampleSearchResponse,
-  FulfillmentOrderResponse,
-  IdentityUserResponse,
-  LoginRequest,
-  OrderListResponse,
-  OrderResponse,
-  PlaceOrderRequest,
-  UpdateIdentityUserProfileRequest,
-} from './types'
 
 import {
   postAuthLogin as buildPostAuthLoginPath,
@@ -57,9 +32,35 @@ import {
   postOrderReject as buildPostOrderRejectPath,
   postOrderStartPreparing as buildPostOrderStartPreparingPath,
 } from './api'
-
+import type {
+  AuthMeResponse,
+  AuthResponse,
+  BindIdentityUserIdentityRequest,
+  CatalogCategoriesResponse,
+  CatalogItemPath,
+  CatalogItemResponse,
+  CatalogItemsQuery,
+  CatalogItemsResponse,
+  CatalogStoreCatalogResponse,
+  CreateIdentityUserRequest,
+  ExampleItemPath,
+  ExampleItemResponse,
+  ExamplePayload,
+  ExamplePayloadResponse,
+  ExampleSearchQuery,
+  ExampleSearchResponse,
+  FulfillmentOrderPath,
+  FulfillmentOrderResponse,
+  IdentityUserPath,
+  IdentityUserResponse,
+  LoginRequest,
+  OrderListResponse,
+  OrderPath,
+  OrderResponse,
+  PlaceOrderRequest,
+  UpdateIdentityUserProfileRequest,
+} from './types'
 type RuntimeRequestOptions = Omit<ApiRequestOptions, 'json' | 'method' | 'searchParams' | 'signal'>
-
 function buildSearchParams(query: Record<string, unknown>): URLSearchParams | undefined {
   const entries = Object.entries(query).filter(([, value]) => value != null)
   if (entries.length === 0) return undefined
@@ -69,7 +70,6 @@ function buildSearchParams(query: Record<string, unknown>): URLSearchParams | un
   }
   return searchParams
 }
-
 // Auth
 export interface PostAuthLoginOptions {
   query?: never
@@ -77,20 +77,16 @@ export interface PostAuthLoginOptions {
   body: LoginRequest
   signal?: AbortSignal
 }
-
 export function postAuthLogin(
   options: PostAuthLoginOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<AuthResponse> {
-  return requestJson<AuthResponse>(
-    buildPostAuthLoginPath(),
-    {
+  return requestJson<AuthResponse>(buildPostAuthLoginPath(), {
     ...requestOptions,
     method: 'POST',
     json: options.body,
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostAuthLogoutOptions {
   query?: never
@@ -98,19 +94,15 @@ export interface PostAuthLogoutOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function postAuthLogout(
   options: PostAuthLogoutOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<void> {
-  return requestVoid(
-    buildPostAuthLogoutPath(),
-    {
+  return requestVoid(buildPostAuthLogoutPath(), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetAuthMeOptions {
   query?: never
@@ -118,19 +110,15 @@ export interface GetAuthMeOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function getAuthMe(
   options: GetAuthMeOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<AuthMeResponse> {
-  return requestJson<AuthMeResponse>(
-    buildGetAuthMePath(),
-    {
+  return requestJson<AuthMeResponse>(buildGetAuthMePath(), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostAuthRefreshOptions {
   query?: never
@@ -138,21 +126,16 @@ export interface PostAuthRefreshOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function postAuthRefresh(
   options: PostAuthRefreshOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<AuthResponse> {
-  return requestJson<AuthResponse>(
-    buildPostAuthRefreshPath(),
-    {
+  return requestJson<AuthResponse>(buildPostAuthRefreshPath(), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
-
 // Catalog
 export interface GetCatalogCategoriesOptions {
   query?: never
@@ -160,19 +143,15 @@ export interface GetCatalogCategoriesOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function getCatalogCategories(
   options: GetCatalogCategoriesOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<CatalogCategoriesResponse> {
-  return requestJson<CatalogCategoriesResponse>(
-    buildGetCatalogCategoriesPath(),
-    {
+  return requestJson<CatalogCategoriesResponse>(buildGetCatalogCategoriesPath(), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetCatalogItemsOptions {
   query: CatalogItemsQuery
@@ -180,40 +159,32 @@ export interface GetCatalogItemsOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function getCatalogItems(
   options: GetCatalogItemsOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<CatalogItemsResponse> {
-  return requestJson<CatalogItemsResponse>(
-    buildGetCatalogItemsPath(),
-    {
+  return requestJson<CatalogItemsResponse>(buildGetCatalogItemsPath(), {
     ...requestOptions,
     method: 'GET',
     searchParams: buildSearchParams(options.query),
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetCatalogItemOptions {
   query?: never
-  path: operations['get_item']['parameters']['path']
+  path: CatalogItemPath
   body?: never
   signal?: AbortSignal
 }
-
 export function getCatalogItem(
   options: GetCatalogItemOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<CatalogItemResponse> {
-  return requestJson<CatalogItemResponse>(
-    buildGetCatalogItemPath(options.path),
-    {
+  return requestJson<CatalogItemResponse>(buildGetCatalogItemPath(options.path), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetCatalogStoreOptions {
   query?: never
@@ -221,21 +192,16 @@ export interface GetCatalogStoreOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function getCatalogStore(
   options: GetCatalogStoreOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<CatalogStoreCatalogResponse> {
-  return requestJson<CatalogStoreCatalogResponse>(
-    buildGetCatalogStorePath(),
-    {
+  return requestJson<CatalogStoreCatalogResponse>(buildGetCatalogStorePath(), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
-
 // Examples
 export interface PostExamplesEchoOptions {
   query?: never
@@ -243,40 +209,32 @@ export interface PostExamplesEchoOptions {
   body: ExamplePayload
   signal?: AbortSignal
 }
-
 export function postExamplesEcho(
   options: PostExamplesEchoOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<ExamplePayloadResponse> {
-  return requestJson<ExamplePayloadResponse>(
-    buildPostExamplesEchoPath(),
-    {
+  return requestJson<ExamplePayloadResponse>(buildPostExamplesEchoPath(), {
     ...requestOptions,
     method: 'POST',
     json: options.body,
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetExamplesItemOptions {
   query?: never
-  path: operations['get_example_item']['parameters']['path']
+  path: ExampleItemPath
   body?: never
   signal?: AbortSignal
 }
-
 export function getExamplesItem(
   options: GetExamplesItemOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<ExampleItemResponse> {
-  return requestJson<ExampleItemResponse>(
-    buildGetExamplesItemPath(options.path),
-    {
+  return requestJson<ExampleItemResponse>(buildGetExamplesItemPath(options.path), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetExamplesSearchOptions {
   query: ExampleSearchQuery
@@ -284,22 +242,17 @@ export interface GetExamplesSearchOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function getExamplesSearch(
   options: GetExamplesSearchOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<ExampleSearchResponse> {
-  return requestJson<ExampleSearchResponse>(
-    buildGetExamplesSearchPath(),
-    {
+  return requestJson<ExampleSearchResponse>(buildGetExamplesSearchPath(), {
     ...requestOptions,
     method: 'GET',
     searchParams: buildSearchParams(options.query),
     signal: options.signal,
-    },
-  )
+  })
 }
-
 // Identity
 export interface PostIdentityUsersOptions {
   query?: never
@@ -307,124 +260,99 @@ export interface PostIdentityUsersOptions {
   body: CreateIdentityUserRequest
   signal?: AbortSignal
 }
-
 export function postIdentityUsers(
   options: PostIdentityUsersOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<IdentityUserResponse> {
-  return requestJson<IdentityUserResponse>(
-    buildPostIdentityUsersPath(),
-    {
+  return requestJson<IdentityUserResponse>(buildPostIdentityUsersPath(), {
     ...requestOptions,
     method: 'POST',
     json: options.body,
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetIdentityUserOptions {
   query?: never
-  path: operations['get_user']['parameters']['path']
+  path: IdentityUserPath
   body?: never
   signal?: AbortSignal
 }
-
 export function getIdentityUser(
   options: GetIdentityUserOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<IdentityUserResponse> {
-  return requestJson<IdentityUserResponse>(
-    buildGetIdentityUserPath(options.path),
-    {
+  return requestJson<IdentityUserResponse>(buildGetIdentityUserPath(options.path), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostIdentityUserDisableOptions {
   query?: never
-  path: operations['disable_user']['parameters']['path']
+  path: IdentityUserPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postIdentityUserDisable(
   options: PostIdentityUserDisableOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<IdentityUserResponse> {
-  return requestJson<IdentityUserResponse>(
-    buildPostIdentityUserDisablePath(options.path),
-    {
+  return requestJson<IdentityUserResponse>(buildPostIdentityUserDisablePath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostIdentityUserIdentitiesOptions {
   query?: never
-  path: operations['bind_user_identity']['parameters']['path']
+  path: IdentityUserPath
   body: BindIdentityUserIdentityRequest
   signal?: AbortSignal
 }
-
 export function postIdentityUserIdentities(
   options: PostIdentityUserIdentitiesOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<IdentityUserResponse> {
-  return requestJson<IdentityUserResponse>(
-    buildPostIdentityUserIdentitiesPath(options.path),
-    {
+  return requestJson<IdentityUserResponse>(buildPostIdentityUserIdentitiesPath(options.path), {
     ...requestOptions,
     method: 'POST',
     json: options.body,
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PatchIdentityUserProfileOptions {
   query?: never
-  path: operations['update_user_profile']['parameters']['path']
+  path: IdentityUserPath
   body: UpdateIdentityUserProfileRequest
   signal?: AbortSignal
 }
-
 export function patchIdentityUserProfile(
   options: PatchIdentityUserProfileOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<IdentityUserResponse> {
-  return requestJson<IdentityUserResponse>(
-    buildPatchIdentityUserProfilePath(options.path),
-    {
+  return requestJson<IdentityUserResponse>(buildPatchIdentityUserProfilePath(options.path), {
     ...requestOptions,
     method: 'PATCH',
     json: options.body,
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostIdentityUserSoftDeleteOptions {
   query?: never
-  path: operations['soft_delete_user']['parameters']['path']
+  path: IdentityUserPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postIdentityUserSoftDelete(
   options: PostIdentityUserSoftDeleteOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<IdentityUserResponse> {
-  return requestJson<IdentityUserResponse>(
-    buildPostIdentityUserSoftDeletePath(options.path),
-    {
+  return requestJson<IdentityUserResponse>(buildPostIdentityUserSoftDeletePath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
-
 // Orders
 export interface GetOrdersOptions {
   query?: never
@@ -432,19 +360,15 @@ export interface GetOrdersOptions {
   body?: never
   signal?: AbortSignal
 }
-
 export function getOrders(
   options: GetOrdersOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<OrderListResponse> {
-  return requestJson<OrderListResponse>(
-    buildGetOrdersPath(),
-    {
+  return requestJson<OrderListResponse>(buildGetOrdersPath(), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrdersOptions {
   query?: never
@@ -452,158 +376,126 @@ export interface PostOrdersOptions {
   body: PlaceOrderRequest
   signal?: AbortSignal
 }
-
 export function postOrders(
   options: PostOrdersOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<OrderResponse> {
-  return requestJson<OrderResponse>(
-    buildPostOrdersPath(),
-    {
+  return requestJson<OrderResponse>(buildPostOrdersPath(), {
     ...requestOptions,
     method: 'POST',
     json: options.body,
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface GetOrderOptions {
   query?: never
-  path: operations['get_order']['parameters']['path']
+  path: OrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function getOrder(
   options: GetOrderOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<OrderResponse> {
-  return requestJson<OrderResponse>(
-    buildGetOrderPath(options.path),
-    {
+  return requestJson<OrderResponse>(buildGetOrderPath(options.path), {
     ...requestOptions,
     method: 'GET',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrderAcceptOptions {
   query?: never
-  path: operations['accept_order']['parameters']['path']
+  path: FulfillmentOrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postOrderAccept(
   options: PostOrderAcceptOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<FulfillmentOrderResponse> {
-  return requestJson<FulfillmentOrderResponse>(
-    buildPostOrderAcceptPath(options.path),
-    {
+  return requestJson<FulfillmentOrderResponse>(buildPostOrderAcceptPath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrderCancelOptions {
   query?: never
-  path: operations['cancel_order']['parameters']['path']
+  path: OrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postOrderCancel(
   options: PostOrderCancelOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<OrderResponse> {
-  return requestJson<OrderResponse>(
-    buildPostOrderCancelPath(options.path),
-    {
+  return requestJson<OrderResponse>(buildPostOrderCancelPath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrderCompleteOptions {
   query?: never
-  path: operations['complete_order']['parameters']['path']
+  path: FulfillmentOrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postOrderComplete(
   options: PostOrderCompleteOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<FulfillmentOrderResponse> {
-  return requestJson<FulfillmentOrderResponse>(
-    buildPostOrderCompletePath(options.path),
-    {
+  return requestJson<FulfillmentOrderResponse>(buildPostOrderCompletePath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrderReadyOptions {
   query?: never
-  path: operations['mark_order_ready']['parameters']['path']
+  path: FulfillmentOrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postOrderReady(
   options: PostOrderReadyOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<FulfillmentOrderResponse> {
-  return requestJson<FulfillmentOrderResponse>(
-    buildPostOrderReadyPath(options.path),
-    {
+  return requestJson<FulfillmentOrderResponse>(buildPostOrderReadyPath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrderRejectOptions {
   query?: never
-  path: operations['reject_order']['parameters']['path']
+  path: FulfillmentOrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postOrderReject(
   options: PostOrderRejectOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<FulfillmentOrderResponse> {
-  return requestJson<FulfillmentOrderResponse>(
-    buildPostOrderRejectPath(options.path),
-    {
+  return requestJson<FulfillmentOrderResponse>(buildPostOrderRejectPath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
 export interface PostOrderStartPreparingOptions {
   query?: never
-  path: operations['start_preparing_order']['parameters']['path']
+  path: FulfillmentOrderPath
   body?: never
   signal?: AbortSignal
 }
-
 export function postOrderStartPreparing(
   options: PostOrderStartPreparingOptions,
   requestOptions: RuntimeRequestOptions = {},
 ): Promise<FulfillmentOrderResponse> {
-  return requestJson<FulfillmentOrderResponse>(
-    buildPostOrderStartPreparingPath(options.path),
-    {
+  return requestJson<FulfillmentOrderResponse>(buildPostOrderStartPreparingPath(options.path), {
     ...requestOptions,
     method: 'POST',
     signal: options.signal,
-    },
-  )
+  })
 }
