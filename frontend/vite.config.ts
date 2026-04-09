@@ -3,9 +3,8 @@ import { devtools } from '@tanstack/devtools-vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
+import { openapiCodegen } from 'vite-plugin-openapi-codegen'
 import { defineConfig } from 'vite-plus'
-
-import { openapiCodegen } from './plugins/vite-plugin-openapi-codegen.ts'
 
 const API_PROXY_TARGET = 'http://127.0.0.1:8080'
 
