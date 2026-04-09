@@ -2,16 +2,25 @@
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { createAppQueryClient } from '#/integrations/tanstack-query/query-client'
+import { installMockLocalStorage } from '#/test/local-storage'
 
 import { readRecentOrderId, useOrderQuery, useOrdersQuery, usePlaceOrderMutation } from './queries'
 
 describe('order query integration', () => {
+  let restoreLocalStorage: (() => void) | undefined
+
+  beforeEach(() => {
+    restoreLocalStorage = installMockLocalStorage()
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
+    restoreLocalStorage?.()
+    restoreLocalStorage = undefined
   })
 
   it('fetches order detail and caches placed orders', async () => {

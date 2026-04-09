@@ -211,9 +211,10 @@ async fn sqlx_user_repository_rejects_invalid_uuid_string(pool: PgPool) {
 #[sqlx::test(migrator = "MIGRATOR")]
 async fn sqlx_user_read_repository_returns_none_for_missing_user(pool: PgPool) {
     let read_repository = SqlxUserReadRepository::new(pool);
+    let missing_user_id = unique_uuid().to_string();
 
     let read_model = read_repository
-        .get_by_id(&UserId::new(unique_uuid().to_string()))
+        .get_by_id(&missing_user_id)
         .await
         .unwrap();
 
@@ -229,7 +230,7 @@ async fn sqlx_user_read_repository_returns_joined_read_model(pool: PgPool) {
     insert_user(&factory, &user).await;
 
     let read_repository = SqlxUserReadRepository::new(pool);
-    let read_model = read_repository.get_by_id(user.id()).await.unwrap().unwrap();
+    let read_model = read_repository.get_by_id(user.id().as_str()).await.unwrap().unwrap();
 
     assert_eq!(read_model.user_id, user.id().as_str());
     assert_eq!(read_model.profile.display_name, "Alice");

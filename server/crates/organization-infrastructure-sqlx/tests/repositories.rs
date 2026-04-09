@@ -136,7 +136,7 @@ async fn sqlx_brand_read_repository_returns_brand_ref_by_id(pool: PgPool) {
 
     let repository = SqlxBrandReadRepository::new(pool);
     let brand = repository
-        .get_by_id(&BrandId::new(brand_id.to_string()))
+        .get_by_id(&brand_id.to_string())
         .await
         .unwrap()
         .unwrap();
@@ -148,10 +148,7 @@ async fn sqlx_brand_read_repository_returns_brand_ref_by_id(pool: PgPool) {
 async fn sqlx_brand_read_repository_rejects_invalid_uuid_inputs(pool: PgPool) {
     let repository = SqlxBrandReadRepository::new(pool);
 
-    let error = repository
-        .get_by_id(&BrandId::new("not-a-uuid"))
-        .await
-        .unwrap_err();
+    let error = repository.get_by_id("not-a-uuid").await.unwrap_err();
 
     assert!(error.to_string().contains("brand id must be a valid UUID"));
 }
@@ -176,7 +173,7 @@ async fn sqlx_brand_read_repository_skips_deleted_brand(pool: PgPool) {
 
     let repository = SqlxBrandReadRepository::new(pool);
     let brand = repository
-        .get_by_id(&BrandId::new(brand_id.to_string()))
+        .get_by_id(&brand_id.to_string())
         .await
         .unwrap();
 
@@ -190,7 +187,7 @@ async fn get_by_id_returns_store_when_store_exists(pool: PgPool) {
 
     let repository = SqlxStoreReadRepository::new(pool);
     let store = repository
-        .get_by_id(&StoreId::new(store_id.to_string()))
+        .get_by_id(&store_id.to_string())
         .await
         .unwrap()
         .unwrap();
@@ -203,10 +200,7 @@ async fn get_by_id_returns_store_when_store_exists(pool: PgPool) {
 async fn get_by_id_rejects_invalid_uuid_inputs(pool: PgPool) {
     let repository = SqlxStoreReadRepository::new(pool);
 
-    let error = repository
-        .get_by_id(&StoreId::new("not-a-uuid"))
-        .await
-        .unwrap_err();
+    let error = repository.get_by_id("not-a-uuid").await.unwrap_err();
 
     assert!(error.to_string().contains("store id must be a valid UUID"));
 }
@@ -231,7 +225,7 @@ async fn get_by_id_skips_deleted_store(pool: PgPool) {
 
     let repository = SqlxStoreReadRepository::new(pool);
     let store = repository
-        .get_by_id(&StoreId::new(store_id.to_string()))
+        .get_by_id(&store_id.to_string())
         .await
         .unwrap();
 

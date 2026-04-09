@@ -2,9 +2,10 @@
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { createAppQueryClient } from '#/integrations/tanstack-query/query-client'
+import { installMockLocalStorage } from '#/test/local-storage'
 
 import { OrderPage } from './order-page'
 
@@ -13,9 +14,17 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 describe('order page', () => {
+  let restoreLocalStorage: (() => void) | undefined
+
+  beforeEach(() => {
+    restoreLocalStorage = installMockLocalStorage()
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
+    restoreLocalStorage?.()
+    restoreLocalStorage = undefined
   })
 
   it('renders order detail and refreshes status', async () => {

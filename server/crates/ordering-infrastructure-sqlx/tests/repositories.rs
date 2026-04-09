@@ -51,7 +51,7 @@ async fn sqlx_order_repositories_persist_and_load_snapshot(pool: PgPool) {
 
     let query_repository = SqlxOrderReadRepository::new(pool.clone());
     let read_model = query_repository
-        .get_by_id(order.id())
+        .get_by_id(order.id().as_str())
         .await
         .unwrap()
         .unwrap();

@@ -2,15 +2,30 @@
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { createAppQueryClient } from '#/integrations/tanstack-query/query-client'
+import { installMockLocalStorage } from '#/test/local-storage'
 
 import { MenuPage } from './menu-page'
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
+  useNavigate: () => vi.fn(),
+}))
+
 describe('menu page', () => {
+  let restoreLocalStorage: (() => void) | undefined
+
+  beforeEach(() => {
+    restoreLocalStorage = installMockLocalStorage()
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
+    window.localStorage.clear()
+    restoreLocalStorage?.()
+    restoreLocalStorage = undefined
   })
 
   it('renders menu data and notifies category changes', async () => {
