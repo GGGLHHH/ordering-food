@@ -2,7 +2,7 @@ use crate::{
     AcceptOrder, Clock, CommercialOrderProjectionQueryService,
     CommercialOrderProjectionReadRepository, CommercialOrderProjectionStore, CompleteOrder,
     IdGenerator, MarkOrderReadyForPickup, OrderingCommercialEventHandler, RejectOrderByStore,
-    StartPreparingOrder, TransactionManager, WorkflowOrderQueryService,
+    StartPreparingOrder, TransactionManager, WorkflowActionAuthorizer, WorkflowOrderQueryService,
     WorkflowOrderReadRepository, WorkflowOrderRepository,
 };
 use std::sync::Arc;
@@ -27,6 +27,7 @@ impl FulfillmentModule {
             dyn CommercialOrderProjectionReadRepository,
         >,
         commercial_order_projection_store: Arc<dyn CommercialOrderProjectionStore>,
+        workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer>,
         transaction_manager: Arc<dyn TransactionManager>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
@@ -44,30 +45,35 @@ impl FulfillmentModule {
         Self {
             accept_order: Arc::new(AcceptOrder::new(
                 workflow_order_repository.clone(),
+                workflow_action_authorizer.clone(),
                 transaction_manager.clone(),
                 clock.clone(),
                 commercial_queries.clone(),
             )),
             start_preparing_order: Arc::new(StartPreparingOrder::new(
                 workflow_order_repository.clone(),
+                workflow_action_authorizer.clone(),
                 transaction_manager.clone(),
                 clock.clone(),
                 commercial_queries.clone(),
             )),
             mark_order_ready_for_pickup: Arc::new(MarkOrderReadyForPickup::new(
                 workflow_order_repository.clone(),
+                workflow_action_authorizer.clone(),
                 transaction_manager.clone(),
                 clock.clone(),
                 commercial_queries.clone(),
             )),
             complete_order: Arc::new(CompleteOrder::new(
                 workflow_order_repository.clone(),
+                workflow_action_authorizer.clone(),
                 transaction_manager.clone(),
                 clock.clone(),
                 commercial_queries.clone(),
             )),
             reject_order_by_store: Arc::new(RejectOrderByStore::new(
                 workflow_order_repository,
+                workflow_action_authorizer,
                 transaction_manager,
                 clock,
                 commercial_queries.clone(),

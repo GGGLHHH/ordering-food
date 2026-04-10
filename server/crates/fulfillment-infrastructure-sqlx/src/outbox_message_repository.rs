@@ -1,9 +1,20 @@
-use async_trait::async_trait;
-use ordering_food_fulfillment_application::{
-    ApplicationError, OutboxMessage, OutboxMessageReader,
-};
+use ordering_food_fulfillment_application::ApplicationError;
 use ordering_food_shared_kernel::Timestamp;
 use sqlx::{PgPool, Row};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SqlxOutboxMessageRecord {
+    pub id: i64,
+    pub producer_context: String,
+    pub event_type: String,
+    pub aggregate_id: String,
+    pub payload: serde_json::Value,
+    pub occurred_at: Timestamp,
+    pub available_at: Timestamp,
+    pub error_count: i32,
+    pub last_error: Option<String>,
+    pub created_at: Timestamp,
+}
 
 #[derive(Clone)]
 pub struct SqlxOutboxMessageRepository {
@@ -16,15 +27,14 @@ impl SqlxOutboxMessageRepository {
     }
 }
 
-#[async_trait]
-impl OutboxMessageReader for SqlxOutboxMessageRepository {
-    async fn list_available(
+impl SqlxOutboxMessageRepository {
+    pub async fn list_available(
         &self,
         producer_context: &str,
         after_id: i64,
         available_before: Timestamp,
         limit: i64,
-    ) -> Result<Vec<OutboxMessage>, ApplicationError> {
+    ) -> Result<Vec<SqlxOutboxMessageRecord>, ApplicationError> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -42,6 +52,7 @@ impl OutboxMessageReader for SqlxOutboxMessageRepository {
             WHERE producer_context = $1
               AND id > $2
               AND available_at <= $3
+              AND error_count = 0
             ORDER BY id ASC
             LIMIT $4
             "#,
@@ -58,7 +69,7 @@ impl OutboxMessageReader for SqlxOutboxMessageRepository {
 
         Ok(rows
             .into_iter()
-            .map(|row| OutboxMessage {
+            .map(|row| SqlxOutboxMessageRecord {
                 id: row.get("id"),
                 producer_context: row.get("producer_context"),
                 event_type: row.get("event_type"),
@@ -73,7 +84,7 @@ impl OutboxMessageReader for SqlxOutboxMessageRepository {
             .collect())
     }
 
-    async fn record_failure(
+    pub async fn record_failure(
         &self,
         message_id: i64,
         last_error: &str,

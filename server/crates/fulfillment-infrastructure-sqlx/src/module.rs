@@ -3,14 +3,18 @@ use crate::{
     SqlxWorkflowOrderReadRepository, SqlxWorkflowOrderRepository,
 };
 use ordering_food_fulfillment_application::{
-    Clock, FulfillmentModule, IdGenerator, OrderingCommercialEventHandler,
+    Clock, FulfillmentModule, IdGenerator, OrderingCommercialEventHandler, WorkflowActionAuthorizer,
 };
 use ordering_food_fulfillment_domain::FulfillmentOrderId;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub fn build_fulfillment_module(pool: PgPool, clock: Arc<dyn Clock>) -> Arc<FulfillmentModule> {
+pub fn build_fulfillment_module(
+    pool: PgPool,
+    clock: Arc<dyn Clock>,
+    workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer>,
+) -> Arc<FulfillmentModule> {
     let workflow_order_repository = Arc::new(SqlxWorkflowOrderRepository);
     let workflow_order_read_repository =
         Arc::new(SqlxWorkflowOrderReadRepository::new(pool.clone()));
@@ -24,6 +28,7 @@ pub fn build_fulfillment_module(pool: PgPool, clock: Arc<dyn Clock>) -> Arc<Fulf
         workflow_order_read_repository,
         commercial_order_projection_repository.clone(),
         commercial_order_projection_repository,
+        workflow_action_authorizer,
         transaction_manager,
         clock,
         id_generator,

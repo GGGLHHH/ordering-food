@@ -1,12 +1,8 @@
 use crate::ApplicationError;
 use async_trait::async_trait;
 use ordering_food_fulfillment_domain::{FulfillmentOrder, FulfillmentOrderId};
-pub use ordering_food_ordering_published::{
-    OrderCancelledByCustomer, OrderCommercialStateChanged, OrderPlaced, OrderPlacedItem,
-};
 pub use ordering_food_platform_kernel::Clock;
 use ordering_food_shared_kernel::Timestamp;
-use serde_json::Value;
 use std::{any::Any, sync::Arc};
 
 pub trait TransactionContext: Send {
@@ -170,59 +166,4 @@ impl CommercialOrderProjectionQueryService {
 
         Ok(projection)
     }
-}
-
-// --- Outbox & Projection Checkpoint Ports ---
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct OutboxMessage {
-    pub id: i64,
-    pub producer_context: String,
-    pub event_type: String,
-    pub aggregate_id: String,
-    pub payload: Value,
-    pub occurred_at: Timestamp,
-    pub available_at: Timestamp,
-    pub error_count: i32,
-    pub last_error: Option<String>,
-    pub created_at: Timestamp,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProjectionCheckpoint {
-    pub projector_name: String,
-    pub last_processed_id: i64,
-    pub updated_at: Timestamp,
-}
-
-#[async_trait]
-pub trait OutboxMessageReader: Send + Sync {
-    async fn list_available(
-        &self,
-        producer_context: &str,
-        after_id: i64,
-        available_before: Timestamp,
-        limit: i64,
-    ) -> Result<Vec<OutboxMessage>, ApplicationError>;
-
-    async fn record_failure(
-        &self,
-        message_id: i64,
-        last_error: &str,
-    ) -> Result<(), ApplicationError>;
-}
-
-#[async_trait]
-pub trait ProjectionCheckpointStore: Send + Sync {
-    async fn get(
-        &self,
-        projector_name: &str,
-    ) -> Result<ProjectionCheckpoint, ApplicationError>;
-
-    async fn save(
-        &self,
-        projector_name: &str,
-        last_processed_id: i64,
-        updated_at: Timestamp,
-    ) -> Result<(), ApplicationError>;
 }

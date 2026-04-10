@@ -1,64 +1,21 @@
+#[path = "support/transaction.rs"]
+mod transaction_support;
+
 use async_trait::async_trait;
 use ordering_food_fulfillment_application::{
-    ApplicationError, CommercialOrderProjectionItemReadModel, CommercialOrderProjectionReadModel,
-    CommercialOrderProjectionReadRepository, CommercialOrderProjectionStore, IdGenerator,
-    OrderCancelledByCustomer, OrderCommercialStateChanged, OrderPlaced, OrderPlacedItem,
-    OrderingCommercialEventHandler, TransactionContext, TransactionManager,
-    WorkflowOrderRepository,
+    ApplicationError, CommercialOrderCancelledByCustomer, CommercialOrderPlaced,
+    CommercialOrderPlacedItem, CommercialOrderProjectionItemReadModel,
+    CommercialOrderProjectionReadModel, CommercialOrderProjectionReadRepository,
+    CommercialOrderProjectionStore, CommercialOrderStateChanged, IdGenerator,
+    OrderingCommercialEventHandler, TransactionContext, WorkflowOrderRepository,
 };
 use ordering_food_fulfillment_domain::{FulfillmentOrder, FulfillmentOrderId, WorkflowStatus};
 use ordering_food_shared_kernel::Timestamp;
 use std::{
-    any::Any,
     sync::{Arc, Mutex},
 };
 use time::macros::datetime;
-
-#[derive(Default)]
-struct FakeTransactionContext;
-
-impl TransactionContext for FakeTransactionContext {
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-        self
-    }
-}
-
-#[derive(Default)]
-struct RecordingTransactionManager {
-    committed: Mutex<u32>,
-    rolled_back: Mutex<u32>,
-}
-
-impl RecordingTransactionManager {
-    fn committed(&self) -> u32 {
-        *self.committed.lock().unwrap()
-    }
-
-    fn rolled_back(&self) -> u32 {
-        *self.rolled_back.lock().unwrap()
-    }
-}
-
-#[async_trait]
-impl TransactionManager for RecordingTransactionManager {
-    async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
-        Ok(Box::new(FakeTransactionContext))
-    }
-
-    async fn commit(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        *self.committed.lock().unwrap() += 1;
-        Ok(())
-    }
-
-    async fn rollback(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        *self.rolled_back.lock().unwrap() += 1;
-        Ok(())
-    }
-}
+use transaction_support::RecordingTransactionManager;
 
 struct FixedIdGenerator;
 
@@ -160,8 +117,8 @@ fn build_handler(
     )
 }
 
-fn sample_order_placed() -> OrderPlaced {
-    OrderPlaced {
+fn sample_order_placed() -> CommercialOrderPlaced {
+    CommercialOrderPlaced {
         order_id: "order-1".to_string(),
         customer_id: "customer-1".to_string(),
         store_id: "store-1".to_string(),
@@ -170,7 +127,7 @@ fn sample_order_placed() -> OrderPlaced {
         total_amount: 1800,
         created_at: datetime!(2026-03-15 10:00 UTC),
         updated_at: datetime!(2026-03-15 10:00 UTC),
-        items: vec![OrderPlacedItem {
+        items: vec![CommercialOrderPlacedItem {
             line_number: 1,
             catalog_item_id: "item-1".to_string(),
             name: "Noodles".to_string(),
@@ -233,6 +190,7 @@ async fn order_placed_event_bootstraps_projection_and_workflow() {
             .status(),
         WorkflowStatus::PendingAcceptance
     );
+    assert_eq!(transactions.began(), 1);
     assert_eq!(transactions.committed(), 1);
     assert_eq!(transactions.rolled_back(), 0);
 }
@@ -253,7 +211,7 @@ async fn commercial_state_changed_event_updates_local_projection_status() {
         .unwrap();
 
     handler
-        .handle_order_commercial_state_changed(&OrderCommercialStateChanged {
+        .handle_order_commercial_state_changed(&CommercialOrderStateChanged {
             order_id: "order-1".to_string(),
             customer_id: "customer-1".to_string(),
             store_id: "store-1".to_string(),
@@ -271,6 +229,7 @@ async fn commercial_state_changed_event_updates_local_projection_status() {
         .unwrap();
     assert_eq!(projection.status, "cancelled_by_customer");
     assert_eq!(projection.updated_at, datetime!(2026-03-15 10:10 UTC));
+    assert_eq!(transactions.began(), 2);
     assert_eq!(transactions.committed(), 2);
     assert_eq!(transactions.rolled_back(), 0);
 }
@@ -291,7 +250,7 @@ async fn order_cancelled_by_customer_event_marks_workflow_cancelled() {
         .unwrap();
 
     handler
-        .handle_order_cancelled_by_customer(&OrderCancelledByCustomer {
+        .handle_order_cancelled_by_customer(&CommercialOrderCancelledByCustomer {
             order_id: "order-1".to_string(),
             customer_id: "customer-1".to_string(),
             store_id: "store-1".to_string(),
@@ -316,6 +275,7 @@ async fn order_cancelled_by_customer_event_marks_workflow_cancelled() {
             .status(),
         WorkflowStatus::CancelledByCustomer
     );
+    assert_eq!(transactions.began(), 2);
     assert_eq!(transactions.committed(), 2);
     assert_eq!(transactions.rolled_back(), 0);
 }

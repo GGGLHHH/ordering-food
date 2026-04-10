@@ -1,9 +1,13 @@
-use async_trait::async_trait;
-use ordering_food_fulfillment_application::{
-    ApplicationError, ProjectionCheckpoint, ProjectionCheckpointStore,
-};
+use ordering_food_fulfillment_application::ApplicationError;
 use ordering_food_shared_kernel::Timestamp;
 use sqlx::{PgPool, Row};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SqlxProjectionCheckpoint {
+    pub projector_name: String,
+    pub last_processed_id: i64,
+    pub updated_at: Timestamp,
+}
 
 #[derive(Clone)]
 pub struct SqlxProjectionCheckpointStore {
@@ -16,12 +20,11 @@ impl SqlxProjectionCheckpointStore {
     }
 }
 
-#[async_trait]
-impl ProjectionCheckpointStore for SqlxProjectionCheckpointStore {
-    async fn get(
+impl SqlxProjectionCheckpointStore {
+    pub async fn get(
         &self,
         projector_name: &str,
-    ) -> Result<ProjectionCheckpoint, ApplicationError> {
+    ) -> Result<SqlxProjectionCheckpoint, ApplicationError> {
         let row = sqlx::query(
             r#"
             SELECT
@@ -41,12 +44,12 @@ impl ProjectionCheckpointStore for SqlxProjectionCheckpointStore {
         })?;
 
         Ok(row.map_or(
-            ProjectionCheckpoint {
+            SqlxProjectionCheckpoint {
                 projector_name: projector_name.to_string(),
                 last_processed_id: 0,
                 updated_at: Timestamp::UNIX_EPOCH,
             },
-            |row| ProjectionCheckpoint {
+            |row| SqlxProjectionCheckpoint {
                 projector_name: row.get("projector_name"),
                 last_processed_id: row.get("last_processed_id"),
                 updated_at: row.get("updated_at"),
@@ -54,7 +57,7 @@ impl ProjectionCheckpointStore for SqlxProjectionCheckpointStore {
         ))
     }
 
-    async fn save(
+    pub async fn save(
         &self,
         projector_name: &str,
         last_processed_id: i64,

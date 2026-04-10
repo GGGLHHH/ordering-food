@@ -11,7 +11,7 @@ use anyhow::Context;
 use ordering_food_access_published::OrderManagementAccessGateway;
 use ordering_food_bootstrap_core::{BootstrapRegistration, ContextDescriptor};
 use ordering_food_fulfillment_integration::{
-    OrderingEventProjector, build_fulfillment_context_runtime,
+    AccessWorkflowActionAuthorizer, OrderingEventProjector, build_fulfillment_context_runtime,
 };
 use ordering_food_identity_published::AccessTokenVerifier;
 use std::sync::Arc;
@@ -56,7 +56,10 @@ fn fulfillment_bootstrap_registration(
                     "identity capability `identity.access_token_verifier` is not available",
                 )
             })?;
-            let runtime = build_fulfillment_context_runtime(pg_pool, clock);
+            let workflow_action_authorizer =
+                Arc::new(AccessWorkflowActionAuthorizer::new(access_gateway.clone()));
+            let runtime =
+                build_fulfillment_context_runtime(pg_pool, clock, workflow_action_authorizer);
             let module = runtime.module().clone();
             let projector = runtime.ordering_event_projector().clone();
 
@@ -73,7 +76,6 @@ fn fulfillment_bootstrap_registration(
             contribution.add_route_mount(
                 fulfillment::ORDER_ROUTE_PREFIX,
                 crate::routes::fulfillment::router(module.clone())
-                    .layer(axum::Extension(access_gateway))
                     .layer(axum::Extension(token_verifier)),
             );
             contribution.add_openapi_document(FulfillmentApiDoc::openapi());

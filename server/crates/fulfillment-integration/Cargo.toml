@@ -6,10 +6,13 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+async-trait.workspace = true
+ordering-food-access-published = { path = "../access-published" }
 ordering-food-fulfillment-application = { path = "../fulfillment-application" }
 ordering-food-fulfillment-infrastructure-sqlx = { path = "../fulfillment-infrastructure-sqlx" }
 ordering-food-ordering-published = { path = "../ordering-published" }
 ordering-food-platform-kernel = { path = "../platform-kernel" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
 serde_json.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
@@ -18,4 +21,5 @@ thiserror.workspace = true
 ordering-food-database-infrastructure-sqlx = { path = "../database-infrastructure-sqlx" }
 serde_json.workspace = true
 time.workspace = true
+tokio.workspace = true
 uuid.workspace = true

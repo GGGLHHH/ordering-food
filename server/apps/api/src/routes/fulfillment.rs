@@ -4,7 +4,6 @@ use crate::{
     http::{self, ApiPath, AuthenticatedSubject, RequestContext},
 };
 use axum::{Extension, Json, Router, extract::DefaultBodyLimit, routing::post};
-use ordering_food_access_published::OrderManagementAccessGateway;
 use ordering_food_fulfillment_application::{
     AcceptOrderInput, ApplicationError as FulfillmentApplicationError,
     CommercialOrderProjectionQueryService, CommercialOrderProjectionReadModel, CompleteOrderInput,
@@ -112,20 +111,10 @@ pub struct FulfillmentOrderResponse {
 )]
 pub async fn accept_order(
     Extension(module): Extension<Arc<FulfillmentModule>>,
-    Extension(access): Extension<Arc<dyn OrderManagementAccessGateway>>,
     context: RequestContext,
     subject: AuthenticatedSubject,
     ApiPath(path): ApiPath<FulfillmentOrderPath>,
 ) -> Result<Json<FulfillmentOrderResponse>, AppError> {
-    authorize_store_action(
-        &module.workflow_queries(),
-        access.as_ref(),
-        &path.order_id,
-        &subject.subject_id,
-        context.request_id.clone(),
-    )
-    .await?;
-
     module
         .accept_order()
         .execute(AcceptOrderInput {
@@ -161,20 +150,10 @@ pub async fn accept_order(
 )]
 pub async fn start_preparing_order(
     Extension(module): Extension<Arc<FulfillmentModule>>,
-    Extension(access): Extension<Arc<dyn OrderManagementAccessGateway>>,
     context: RequestContext,
     subject: AuthenticatedSubject,
     ApiPath(path): ApiPath<FulfillmentOrderPath>,
 ) -> Result<Json<FulfillmentOrderResponse>, AppError> {
-    authorize_store_action(
-        &module.workflow_queries(),
-        access.as_ref(),
-        &path.order_id,
-        &subject.subject_id,
-        context.request_id.clone(),
-    )
-    .await?;
-
     module
         .start_preparing_order()
         .execute(StartPreparingOrderInput {
@@ -210,20 +189,10 @@ pub async fn start_preparing_order(
 )]
 pub async fn mark_order_ready(
     Extension(module): Extension<Arc<FulfillmentModule>>,
-    Extension(access): Extension<Arc<dyn OrderManagementAccessGateway>>,
     context: RequestContext,
     subject: AuthenticatedSubject,
     ApiPath(path): ApiPath<FulfillmentOrderPath>,
 ) -> Result<Json<FulfillmentOrderResponse>, AppError> {
-    authorize_store_action(
-        &module.workflow_queries(),
-        access.as_ref(),
-        &path.order_id,
-        &subject.subject_id,
-        context.request_id.clone(),
-    )
-    .await?;
-
     module
         .mark_order_ready_for_pickup()
         .execute(MarkOrderReadyForPickupInput {
@@ -259,20 +228,10 @@ pub async fn mark_order_ready(
 )]
 pub async fn complete_order(
     Extension(module): Extension<Arc<FulfillmentModule>>,
-    Extension(access): Extension<Arc<dyn OrderManagementAccessGateway>>,
     context: RequestContext,
     subject: AuthenticatedSubject,
     ApiPath(path): ApiPath<FulfillmentOrderPath>,
 ) -> Result<Json<FulfillmentOrderResponse>, AppError> {
-    authorize_store_action(
-        &module.workflow_queries(),
-        access.as_ref(),
-        &path.order_id,
-        &subject.subject_id,
-        context.request_id.clone(),
-    )
-    .await?;
-
     module
         .complete_order()
         .execute(CompleteOrderInput {
@@ -308,20 +267,10 @@ pub async fn complete_order(
 )]
 pub async fn reject_order(
     Extension(module): Extension<Arc<FulfillmentModule>>,
-    Extension(access): Extension<Arc<dyn OrderManagementAccessGateway>>,
     context: RequestContext,
     subject: AuthenticatedSubject,
     ApiPath(path): ApiPath<FulfillmentOrderPath>,
 ) -> Result<Json<FulfillmentOrderResponse>, AppError> {
-    authorize_store_action(
-        &module.workflow_queries(),
-        access.as_ref(),
-        &path.order_id,
-        &subject.subject_id,
-        context.request_id.clone(),
-    )
-    .await?;
-
     module
         .reject_order_by_store()
         .execute(RejectOrderByStoreInput {
@@ -339,35 +288,6 @@ pub async fn reject_order(
     )
     .await?;
     Ok(Json(response))
-}
-
-async fn authorize_store_action(
-    workflow_queries: &WorkflowOrderQueryService,
-    access: &dyn OrderManagementAccessGateway,
-    order_id: &str,
-    subject_id: &str,
-    request_id: Option<String>,
-) -> Result<(), AppError> {
-    let workflow = workflow_queries
-        .get_by_ordering_order_id(order_id)
-        .await
-        .map_err(|error| map_fulfillment_error(error, request_id.clone()))?
-        .ok_or_else(|| {
-            AppError::not_found("order was not found").with_request_id(request_id.clone())
-        })?;
-
-    let authorized = access
-        .can_manage_order(subject_id, &workflow.store_id)
-        .await
-        .map_err(|_| {
-            AppError::internal("internal server error").with_request_id(request_id.clone())
-        })?;
-
-    if !authorized {
-        return Err(AppError::not_found("order was not found").with_request_id(request_id));
-    }
-
-    Ok(())
 }
 
 async fn load_fulfillment_order_response(
@@ -469,13 +389,12 @@ mod tests {
         http::{HeaderName, Request, StatusCode},
         response::Response,
     };
-    use ordering_food_access_published::{AccessCollaborationError, OrderManagementAccessGateway};
     use ordering_food_fulfillment_application::{
         CommercialOrderProjectionItemReadModel, CommercialOrderProjectionReadModel,
         CommercialOrderProjectionReadRepository, CommercialOrderProjectionStore,
         TransactionContext as FulfillmentTransactionContext,
-        TransactionManager as FulfillmentTransactionManager, WorkflowOrderReadRepository,
-        WorkflowOrderRepository,
+        TransactionManager as FulfillmentTransactionManager, WorkflowAction,
+        WorkflowActionAuthorizer, WorkflowOrderReadRepository, WorkflowOrderRepository,
     };
     use ordering_food_fulfillment_domain::FulfillmentOrder;
     use ordering_food_identity_published::{
@@ -694,44 +613,54 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeOrderManagementAccessGateway {
+    struct FakeWorkflowActionAuthorizer {
         allowed_pairs: Mutex<HashSet<(String, String)>>,
     }
 
     #[async_trait]
-    impl OrderManagementAccessGateway for FakeOrderManagementAccessGateway {
-        async fn can_manage_order(
+    impl WorkflowActionAuthorizer for FakeWorkflowActionAuthorizer {
+        async fn ensure_actor_can_manage_order(
             &self,
-            subject_id: &str,
+            actor_user_id: &str,
             store_id: &str,
-        ) -> Result<bool, AccessCollaborationError> {
-            Ok(self
+            _action: WorkflowAction,
+        ) -> Result<(), FulfillmentApplicationError> {
+            let allowed = self
                 .allowed_pairs
                 .lock()
                 .unwrap()
-                .contains(&(subject_id.to_string(), store_id.to_string())))
+                .contains(&(actor_user_id.to_string(), store_id.to_string()));
+
+            if allowed {
+                Ok(())
+            } else {
+                Err(FulfillmentApplicationError::not_found(
+                    "order was not found",
+                ))
+            }
         }
     }
 
-    impl FakeOrderManagementAccessGateway {
-        fn allow(&self, subject_id: &str, store_id: &str) {
+    impl FakeWorkflowActionAuthorizer {
+        fn allow(&self, actor_user_id: &str, store_id: &str) {
             self.allowed_pairs
                 .lock()
                 .unwrap()
-                .insert((subject_id.to_string(), store_id.to_string()));
+                .insert((actor_user_id.to_string(), store_id.to_string()));
         }
     }
 
     fn build_test_app(
         workflow_repository: Arc<InMemoryWorkflowRepository>,
         commercial_order_repository: Arc<InMemoryCommercialOrderProjectionRepository>,
-        access_gateway: Arc<FakeOrderManagementAccessGateway>,
+        workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer>,
     ) -> Router {
         let module = Arc::new(FulfillmentModule::new(
             workflow_repository.clone(),
             workflow_repository,
             commercial_order_repository.clone(),
             commercial_order_repository,
+            workflow_action_authorizer,
             Arc::new(FakeWorkflowTransactionManager),
             Arc::new(FixedClock {
                 now: datetime!(2026-03-15 10:00 UTC),
@@ -744,11 +673,7 @@ mod tests {
         Router::new()
             .nest(
                 ORDER_ROUTE_PREFIX,
-                router(module)
-                    .layer(Extension(
-                        access_gateway as Arc<dyn OrderManagementAccessGateway>,
-                    ))
-                    .layer(Extension(token_verifier)),
+                router(module).layer(Extension(token_verifier)),
             )
             .fallback(http::not_found)
             .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
@@ -800,12 +725,14 @@ mod tests {
         let commercial_order_repository =
             Arc::new(InMemoryCommercialOrderProjectionRepository::default());
         seed_order(&commercial_order_repository, &workflow_repository);
-        let access_gateway = Arc::new(FakeOrderManagementAccessGateway::default());
-        access_gateway.allow("merchant-1", "store-1");
+        let workflow_action_authorizer = Arc::new(FakeWorkflowActionAuthorizer::default());
+        workflow_action_authorizer.allow("merchant-1", "store-1");
+        let workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer> =
+            workflow_action_authorizer;
         let app = build_test_app(
             workflow_repository,
             commercial_order_repository,
-            access_gateway,
+            workflow_action_authorizer,
         );
 
         let response = app
@@ -832,10 +759,12 @@ mod tests {
         let commercial_order_repository =
             Arc::new(InMemoryCommercialOrderProjectionRepository::default());
         seed_order(&commercial_order_repository, &workflow_repository);
+        let workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer> =
+            Arc::new(FakeWorkflowActionAuthorizer::default());
         let app = build_test_app(
             workflow_repository,
             commercial_order_repository,
-            Arc::new(FakeOrderManagementAccessGateway::default()),
+            workflow_action_authorizer,
         );
 
         let response = app
@@ -859,12 +788,14 @@ mod tests {
         let commercial_order_repository =
             Arc::new(InMemoryCommercialOrderProjectionRepository::default());
         seed_order(&commercial_order_repository, &workflow_repository);
-        let access_gateway = Arc::new(FakeOrderManagementAccessGateway::default());
-        access_gateway.allow("merchant-1", "store-1");
+        let workflow_action_authorizer = Arc::new(FakeWorkflowActionAuthorizer::default());
+        workflow_action_authorizer.allow("merchant-1", "store-1");
+        let workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer> =
+            workflow_action_authorizer;
         let app = build_test_app(
             workflow_repository,
             commercial_order_repository,
-            access_gateway,
+            workflow_action_authorizer,
         );
 
         let response = app
@@ -884,5 +815,54 @@ mod tests {
         assert_eq!(body["workflow_status"], "accepted");
         assert_eq!(body["commercial_status"], "placed");
         assert!(body.get("status").is_none());
+    }
+
+    struct UnexpectedWorkflowActionAuthorizer;
+
+    #[async_trait]
+    impl WorkflowActionAuthorizer for UnexpectedWorkflowActionAuthorizer {
+        async fn ensure_actor_can_manage_order(
+            &self,
+            _actor_user_id: &str,
+            _store_id: &str,
+            _action: WorkflowAction,
+        ) -> Result<(), FulfillmentApplicationError> {
+            Err(FulfillmentApplicationError::unexpected(
+                "authorization backend failed",
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn fulfillment_route_returns_500_on_unexpected_authorization_error() {
+        let workflow_repository = Arc::new(InMemoryWorkflowRepository::default());
+        let commercial_order_repository =
+            Arc::new(InMemoryCommercialOrderProjectionRepository::default());
+        seed_order(&commercial_order_repository, &workflow_repository);
+
+        let workflow_action_authorizer: Arc<dyn WorkflowActionAuthorizer> =
+            Arc::new(UnexpectedWorkflowActionAuthorizer);
+        let app = build_test_app(
+            workflow_repository,
+            commercial_order_repository,
+            workflow_action_authorizer,
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/accept")
+                    .header("cookie", "access_token=token-merchant-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = response_json(response).await;
+        assert_eq!(body["code"], "internal_error");
+        assert_eq!(body["message"], "internal server error");
     }
 }

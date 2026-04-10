@@ -1,7 +1,6 @@
 use ordering_food_fulfillment_application::{
     CommercialOrderProjectionReadModel, CommercialOrderProjectionReadRepository,
-    CommercialOrderProjectionStore, OutboxMessageReader, ProjectionCheckpointStore,
-    TransactionManager,
+    CommercialOrderProjectionStore, TransactionManager,
 };
 use ordering_food_fulfillment_infrastructure_sqlx::{
     SqlxCommercialOrderProjectionRepository, SqlxOutboxMessageRepository,
@@ -114,6 +113,74 @@ async fn outbox_repository_reads_ordering_messages_in_id_order(pool: PgPool) {
     assert_eq!(messages[0].event_type, "ordering.order_placed");
     assert_eq!(
         messages[1].event_type,
+        "ordering.order_cancelled_by_customer"
+    );
+}
+
+#[sqlx::test(migrator = "ordering_food_database_infrastructure_sqlx::MIGRATOR")]
+async fn outbox_repository_hides_failed_messages_from_available_batch(pool: PgPool) {
+    let first_id: i64 = sqlx::query_scalar(
+        r#"
+        INSERT INTO platform.outbox_messages (
+            producer_context,
+            event_type,
+            aggregate_id,
+            payload,
+            occurred_at,
+            available_at,
+            created_at
+        )
+        VALUES ('ordering', 'ordering.order_placed', 'order-1', '{}'::jsonb, $1, $1, $1)
+        RETURNING id
+        "#,
+    )
+    .bind(datetime!(2026-03-15 10:00 UTC))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let second_id: i64 = sqlx::query_scalar(
+        r#"
+        INSERT INTO platform.outbox_messages (
+            producer_context,
+            event_type,
+            aggregate_id,
+            payload,
+            occurred_at,
+            available_at,
+            created_at
+        )
+        VALUES (
+            'ordering',
+            'ordering.order_cancelled_by_customer',
+            'order-2',
+            '{}'::jsonb,
+            $1,
+            $1,
+            $1
+        )
+        RETURNING id
+        "#,
+    )
+    .bind(datetime!(2026-03-15 10:05 UTC))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let repository = SqlxOutboxMessageRepository::new(pool);
+    repository
+        .record_failure(first_id, "decode failed")
+        .await
+        .unwrap();
+
+    let messages = repository
+        .list_available("ordering", 0, datetime!(2026-03-15 11:00 UTC), 50)
+        .await
+        .unwrap();
+
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].id, second_id);
+    assert_eq!(
+        messages[0].event_type,
         "ordering.order_cancelled_by_customer"
     );
 }

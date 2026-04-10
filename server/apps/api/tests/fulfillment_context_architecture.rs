@@ -38,3 +38,16 @@ fn fulfillment_context_uses_local_projection_and_event_projector() {
     assert!(!source.contains("build_fulfillment_module("));
     assert!(!source.contains("build_ordering_event_projector"));
 }
+
+#[test]
+fn fulfillment_route_does_not_hold_store_authorization_logic() {
+    let route_source = read_source("src/routes/fulfillment.rs");
+    assert!(!route_source.contains("authorize_store_action("));
+    assert!(!route_source.contains("Extension(access):"));
+    assert!(!route_source.contains("OrderManagementAccessGateway"));
+    assert!(!route_source.contains(".can_manage_order("));
+}
+
+fn read_source(path: &str) -> String {
+    fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).unwrap()
+}

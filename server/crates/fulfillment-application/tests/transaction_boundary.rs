@@ -1,79 +1,60 @@
+#[path = "support/fixed_clock.rs"]
+mod fixed_clock;
+#[path = "support/transaction.rs"]
+mod transaction_support;
+
 use async_trait::async_trait;
 use ordering_food_fulfillment_application::{
     AcceptOrder, AcceptOrderInput, ApplicationError, Clock, CommercialOrderProjectionQueryService,
     CommercialOrderProjectionReadModel, CommercialOrderProjectionReadRepository, CompleteOrder,
     CompleteOrderInput, MarkOrderReadyForPickup, MarkOrderReadyForPickupInput, RejectOrderByStore,
     RejectOrderByStoreInput, StartPreparingOrder, StartPreparingOrderInput, TransactionContext,
-    TransactionManager, WorkflowOrderRepository,
+    WorkflowAction, WorkflowActionAuthorizer, WorkflowOrderRepository,
 };
+use fixed_clock::FixedClock;
 use ordering_food_fulfillment_domain::FulfillmentOrder;
-use ordering_food_shared_kernel::Timestamp;
 use std::{
-    any::Any,
     sync::{Arc, Mutex},
 };
 use time::macros::datetime;
+use transaction_support::RecordingTransactionManager;
 
-#[derive(Default)]
-struct FakeTransactionContext;
-
-impl TransactionContext for FakeTransactionContext {
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any + Send> {
-        self
-    }
-}
-
-#[derive(Default)]
-struct RecordingTransactionManager {
-    began: Mutex<u32>,
-    committed: Mutex<u32>,
-    rolled_back: Mutex<u32>,
-}
-
-impl RecordingTransactionManager {
-    fn began(&self) -> u32 {
-        *self.began.lock().unwrap()
-    }
-
-    fn committed(&self) -> u32 {
-        *self.committed.lock().unwrap()
-    }
-
-    fn rolled_back(&self) -> u32 {
-        *self.rolled_back.lock().unwrap()
-    }
-}
+struct AllowingWorkflowActionAuthorizer;
 
 #[async_trait]
-impl TransactionManager for RecordingTransactionManager {
-    async fn begin(&self) -> Result<Box<dyn TransactionContext>, ApplicationError> {
-        *self.began.lock().unwrap() += 1;
-        Ok(Box::new(FakeTransactionContext))
-    }
-
-    async fn commit(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        *self.committed.lock().unwrap() += 1;
-        Ok(())
-    }
-
-    async fn rollback(&self, _tx: Box<dyn TransactionContext>) -> Result<(), ApplicationError> {
-        *self.rolled_back.lock().unwrap() += 1;
+impl WorkflowActionAuthorizer for AllowingWorkflowActionAuthorizer {
+    async fn ensure_actor_can_manage_order(
+        &self,
+        _actor_user_id: &str,
+        _store_id: &str,
+        _action: WorkflowAction,
+    ) -> Result<(), ApplicationError> {
         Ok(())
     }
 }
 
-struct FixedClock {
-    now: Timestamp,
+fn allowing_authorizer() -> Arc<dyn WorkflowActionAuthorizer> {
+    Arc::new(AllowingWorkflowActionAuthorizer)
 }
 
-impl Clock for FixedClock {
-    fn now(&self) -> Timestamp {
-        self.now
+struct DenyingWorkflowActionAuthorizer;
+
+#[async_trait]
+impl WorkflowActionAuthorizer for DenyingWorkflowActionAuthorizer {
+    async fn ensure_actor_can_manage_order(
+        &self,
+        _actor_user_id: &str,
+        _store_id: &str,
+        _action: WorkflowAction,
+    ) -> Result<(), ApplicationError> {
+        Err(ApplicationError::not_found(
+            "actor does not have permission to manage this order",
+        ))
     }
+}
+
+fn denying_authorizer() -> Arc<dyn WorkflowActionAuthorizer> {
+    Arc::new(DenyingWorkflowActionAuthorizer)
 }
 
 struct FixedCommercialProjectionRepository {
@@ -92,6 +73,7 @@ impl CommercialOrderProjectionReadRepository for FixedCommercialProjectionReposi
 
 struct InMemoryWorkflowRepository {
     order: Mutex<Option<FulfillmentOrder>>,
+    update_count: Mutex<u32>,
 }
 
 impl InMemoryWorkflowRepository {
@@ -103,7 +85,12 @@ impl InMemoryWorkflowRepository {
                 "store-1",
                 datetime!(2026-03-15 09:00 UTC),
             ))),
+            update_count: Mutex::new(0),
         }
+    }
+
+    fn update_count(&self) -> u32 {
+        *self.update_count.lock().unwrap()
     }
 }
 
@@ -131,6 +118,7 @@ impl WorkflowOrderRepository for InMemoryWorkflowRepository {
         _tx: &mut dyn TransactionContext,
         order: &FulfillmentOrder,
     ) -> Result<(), ApplicationError> {
+        *self.update_count.lock().unwrap() += 1;
         *self.order.lock().unwrap() = Some(order.clone());
         Ok(())
     }
@@ -160,12 +148,31 @@ fn blocked_commercial_queries() -> Arc<CommercialOrderProjectionQueryService> {
     )))
 }
 
+fn allowed_commercial_queries() -> Arc<CommercialOrderProjectionQueryService> {
+    Arc::new(CommercialOrderProjectionQueryService::new(Arc::new(
+        FixedCommercialProjectionRepository {
+            projection: CommercialOrderProjectionReadModel {
+                order_id: "order-1".to_string(),
+                customer_id: "customer-1".to_string(),
+                store_id: "store-1".to_string(),
+                status: "placed".to_string(),
+                subtotal_amount: 1800,
+                total_amount: 1800,
+                created_at: datetime!(2026-03-15 09:00 UTC),
+                updated_at: datetime!(2026-03-15 09:30 UTC),
+                items: Vec::new(),
+            },
+        },
+    )))
+}
+
 #[tokio::test]
 async fn accept_order_does_not_open_transaction_when_projection_rejects() {
     let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
     let transactions = Arc::new(RecordingTransactionManager::default());
     let use_case = AcceptOrder::new(
         repository,
+        allowing_authorizer(),
         transactions.clone(),
         fixed_clock(),
         blocked_commercial_queries(),
@@ -186,11 +193,39 @@ async fn accept_order_does_not_open_transaction_when_projection_rejects() {
 }
 
 #[tokio::test]
+async fn accept_order_rolls_back_when_authorizer_rejects() {
+    let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
+    let transactions = Arc::new(RecordingTransactionManager::default());
+    let use_case = AcceptOrder::new(
+        repository.clone(),
+        denying_authorizer(),
+        transactions.clone(),
+        fixed_clock(),
+        allowed_commercial_queries(),
+    );
+
+    let error = use_case
+        .execute(AcceptOrderInput {
+            order_id: "order-1".to_string(),
+            actor_user_id: "merchant-1".to_string(),
+        })
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, ApplicationError::NotFound { .. }));
+    assert_eq!(transactions.began(), 1);
+    assert_eq!(transactions.committed(), 0);
+    assert_eq!(transactions.rolled_back(), 1);
+    assert_eq!(repository.update_count(), 0);
+}
+
+#[tokio::test]
 async fn start_preparing_does_not_open_transaction_when_projection_rejects() {
     let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
     let transactions = Arc::new(RecordingTransactionManager::default());
     let use_case = StartPreparingOrder::new(
         repository,
+        allowing_authorizer(),
         transactions.clone(),
         fixed_clock(),
         blocked_commercial_queries(),
@@ -211,11 +246,39 @@ async fn start_preparing_does_not_open_transaction_when_projection_rejects() {
 }
 
 #[tokio::test]
+async fn start_preparing_rolls_back_when_authorizer_rejects() {
+    let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
+    let transactions = Arc::new(RecordingTransactionManager::default());
+    let use_case = StartPreparingOrder::new(
+        repository.clone(),
+        denying_authorizer(),
+        transactions.clone(),
+        fixed_clock(),
+        allowed_commercial_queries(),
+    );
+
+    let error = use_case
+        .execute(StartPreparingOrderInput {
+            order_id: "order-1".to_string(),
+            actor_user_id: "merchant-1".to_string(),
+        })
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, ApplicationError::NotFound { .. }));
+    assert_eq!(transactions.began(), 1);
+    assert_eq!(transactions.committed(), 0);
+    assert_eq!(transactions.rolled_back(), 1);
+    assert_eq!(repository.update_count(), 0);
+}
+
+#[tokio::test]
 async fn mark_ready_does_not_open_transaction_when_projection_rejects() {
     let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
     let transactions = Arc::new(RecordingTransactionManager::default());
     let use_case = MarkOrderReadyForPickup::new(
         repository,
+        allowing_authorizer(),
         transactions.clone(),
         fixed_clock(),
         blocked_commercial_queries(),
@@ -236,11 +299,39 @@ async fn mark_ready_does_not_open_transaction_when_projection_rejects() {
 }
 
 #[tokio::test]
+async fn mark_ready_rolls_back_when_authorizer_rejects() {
+    let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
+    let transactions = Arc::new(RecordingTransactionManager::default());
+    let use_case = MarkOrderReadyForPickup::new(
+        repository.clone(),
+        denying_authorizer(),
+        transactions.clone(),
+        fixed_clock(),
+        allowed_commercial_queries(),
+    );
+
+    let error = use_case
+        .execute(MarkOrderReadyForPickupInput {
+            order_id: "order-1".to_string(),
+            actor_user_id: "merchant-1".to_string(),
+        })
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, ApplicationError::NotFound { .. }));
+    assert_eq!(transactions.began(), 1);
+    assert_eq!(transactions.committed(), 0);
+    assert_eq!(transactions.rolled_back(), 1);
+    assert_eq!(repository.update_count(), 0);
+}
+
+#[tokio::test]
 async fn complete_order_does_not_open_transaction_when_projection_rejects() {
     let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
     let transactions = Arc::new(RecordingTransactionManager::default());
     let use_case = CompleteOrder::new(
         repository,
+        allowing_authorizer(),
         transactions.clone(),
         fixed_clock(),
         blocked_commercial_queries(),
@@ -261,11 +352,39 @@ async fn complete_order_does_not_open_transaction_when_projection_rejects() {
 }
 
 #[tokio::test]
+async fn complete_order_rolls_back_when_authorizer_rejects() {
+    let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
+    let transactions = Arc::new(RecordingTransactionManager::default());
+    let use_case = CompleteOrder::new(
+        repository.clone(),
+        denying_authorizer(),
+        transactions.clone(),
+        fixed_clock(),
+        allowed_commercial_queries(),
+    );
+
+    let error = use_case
+        .execute(CompleteOrderInput {
+            order_id: "order-1".to_string(),
+            actor_user_id: "merchant-1".to_string(),
+        })
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, ApplicationError::NotFound { .. }));
+    assert_eq!(transactions.began(), 1);
+    assert_eq!(transactions.committed(), 0);
+    assert_eq!(transactions.rolled_back(), 1);
+    assert_eq!(repository.update_count(), 0);
+}
+
+#[tokio::test]
 async fn reject_order_does_not_open_transaction_when_projection_rejects() {
     let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
     let transactions = Arc::new(RecordingTransactionManager::default());
     let use_case = RejectOrderByStore::new(
         repository,
+        allowing_authorizer(),
         transactions.clone(),
         fixed_clock(),
         blocked_commercial_queries(),
@@ -283,4 +402,31 @@ async fn reject_order_does_not_open_transaction_when_projection_rejects() {
     assert_eq!(transactions.began(), 0);
     assert_eq!(transactions.committed(), 0);
     assert_eq!(transactions.rolled_back(), 0);
+}
+
+#[tokio::test]
+async fn reject_order_rolls_back_when_authorizer_rejects() {
+    let repository = Arc::new(InMemoryWorkflowRepository::with_bootstrapped_order());
+    let transactions = Arc::new(RecordingTransactionManager::default());
+    let use_case = RejectOrderByStore::new(
+        repository.clone(),
+        denying_authorizer(),
+        transactions.clone(),
+        fixed_clock(),
+        allowed_commercial_queries(),
+    );
+
+    let error = use_case
+        .execute(RejectOrderByStoreInput {
+            order_id: "order-1".to_string(),
+            actor_user_id: "merchant-1".to_string(),
+        })
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, ApplicationError::NotFound { .. }));
+    assert_eq!(transactions.began(), 1);
+    assert_eq!(transactions.committed(), 0);
+    assert_eq!(transactions.rolled_back(), 1);
+    assert_eq!(repository.update_count(), 0);
 }

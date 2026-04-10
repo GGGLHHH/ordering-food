@@ -1,7 +1,8 @@
 use crate::{
-    ApplicationError, CommercialOrderProjectionItemReadModel, CommercialOrderProjectionReadModel,
-    CommercialOrderProjectionStore, IdGenerator, OrderCancelledByCustomer,
-    OrderCommercialStateChanged, OrderPlaced, TransactionManager, WorkflowOrderRepository,
+    ApplicationError, CommercialOrderCancelledByCustomer, CommercialOrderPlaced,
+    CommercialOrderProjectionItemReadModel, CommercialOrderProjectionReadModel,
+    CommercialOrderProjectionStore, CommercialOrderStateChanged, IdGenerator, TransactionManager,
+    WorkflowOrderRepository,
 };
 use ordering_food_fulfillment_domain::{FulfillmentOrder, WorkflowStatus};
 use std::sync::Arc;
@@ -28,7 +29,10 @@ impl OrderingCommercialEventHandler {
         }
     }
 
-    pub async fn handle_order_placed(&self, event: &OrderPlaced) -> Result<(), ApplicationError> {
+    pub async fn handle_order_placed(
+        &self,
+        event: &CommercialOrderPlaced,
+    ) -> Result<(), ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
         let projection = map_order_placed_projection(event);
 
@@ -76,7 +80,7 @@ impl OrderingCommercialEventHandler {
 
     pub async fn handle_order_commercial_state_changed(
         &self,
-        event: &OrderCommercialStateChanged,
+        event: &CommercialOrderStateChanged,
     ) -> Result<(), ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
 
@@ -99,7 +103,7 @@ impl OrderingCommercialEventHandler {
 
     pub async fn handle_order_cancelled_by_customer(
         &self,
-        event: &OrderCancelledByCustomer,
+        event: &CommercialOrderCancelledByCustomer,
     ) -> Result<(), ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
 
@@ -145,7 +149,9 @@ impl OrderingCommercialEventHandler {
     }
 }
 
-fn map_order_placed_projection(event: &OrderPlaced) -> CommercialOrderProjectionReadModel {
+fn map_order_placed_projection(
+    event: &CommercialOrderPlaced,
+) -> CommercialOrderProjectionReadModel {
     CommercialOrderProjectionReadModel {
         order_id: event.order_id.clone(),
         customer_id: event.customer_id.clone(),
