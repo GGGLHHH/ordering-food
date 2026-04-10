@@ -90,14 +90,13 @@ impl BootstrapBrandCatalog {
 mod tests {
     use super::{BootstrapBrandCatalog, BootstrapBrandCatalogInput};
     use crate::{
-        ApplicationError, BrandCatalogRepository, Clock, IdGenerator, OrganizationScopeReader,
-        TransactionContext, TransactionManager,
+        ApplicationError, BrandCatalogRepository, CatalogBrandScope, CatalogStoreScope, Clock,
+        IdGenerator, OrganizationScopeReader, TransactionContext, TransactionManager,
     };
     use async_trait::async_trait;
     use ordering_food_catalog_domain::{
         BrandCatalog, BrandCatalogId, BrandId, CategoryId, ItemId, StoreCatalogId,
     };
-    use ordering_food_organization_published::{BrandRef, StoreSummary};
     use ordering_food_shared_kernel::Timestamp;
     use std::{
         any::Any,
@@ -168,7 +167,7 @@ mod tests {
     }
 
     struct FakeOrganizationScopeReader {
-        brand: Option<BrandRef>,
+        brand: Option<CatalogBrandScope>,
     }
 
     impl FakeOrganizationScopeReader {
@@ -178,7 +177,7 @@ mod tests {
 
         fn existing() -> Self {
             Self {
-                brand: Some(BrandRef {
+                brand: Some(CatalogBrandScope {
                     brand_id: "brand-1".to_string(),
                 }),
             }
@@ -187,11 +186,14 @@ mod tests {
 
     #[async_trait]
     impl OrganizationScopeReader for FakeOrganizationScopeReader {
-        async fn get_active_store(&self) -> Result<Option<StoreSummary>, ApplicationError> {
+        async fn get_active_store(&self) -> Result<Option<CatalogStoreScope>, ApplicationError> {
             Ok(None)
         }
 
-        async fn get_brand(&self, _brand_id: &str) -> Result<Option<BrandRef>, ApplicationError> {
+        async fn get_brand(
+            &self,
+            _brand_id: &str,
+        ) -> Result<Option<CatalogBrandScope>, ApplicationError> {
             Ok(self.brand.clone())
         }
 
@@ -199,7 +201,7 @@ mod tests {
             &self,
             _brand_id: &str,
             _store_id: &str,
-        ) -> Result<Option<StoreSummary>, ApplicationError> {
+        ) -> Result<Option<CatalogStoreScope>, ApplicationError> {
             Ok(None)
         }
     }

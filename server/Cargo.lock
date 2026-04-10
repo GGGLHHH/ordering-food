@@ -1315,7 +1315,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "ordering-food-catalog-domain",
- "ordering-food-organization-published",
  "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "thiserror",

@@ -266,10 +266,7 @@ pub async fn get_item(
         })?;
     let listing = module
         .store_item_listing_queries()
-        .find_by_item_id(
-            &active.store_catalog.store_catalog_id,
-            &path.item_id,
-        )
+        .find_by_item_id(&active.store_catalog.store_catalog_id, &path.item_id)
         .await
         .map_err(|error| map_catalog_error(error, context.request_id.clone()))?
         .ok_or_else(|| {

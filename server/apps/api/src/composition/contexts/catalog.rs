@@ -59,10 +59,9 @@ fn catalog_bootstrap_registration(
                 store_scope_gateway.clone(),
                 clock,
             );
-            let _seed_outcome =
-                seed_default_catalog(&catalog_runtime, store_scope_gateway, bootstrap)
-                    .await
-                    .map_err(|error| std::io::Error::other(error.to_string()))?;
+            seed_default_catalog(&catalog_runtime, store_scope_gateway, bootstrap)
+                .await
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
             let catalog_module = catalog_runtime.module().clone();
 
             let mut contribution = ApiContextContribution::empty(context_id);

@@ -93,14 +93,11 @@ impl AttachStoreCatalog {
 mod tests {
     use super::{AttachStoreCatalog, AttachStoreCatalogInput};
     use crate::{
-        ApplicationError, Clock, IdGenerator, OrganizationScopeReader, StoreCatalogRepository,
-        TransactionContext, TransactionManager,
+        ApplicationError, CatalogBrandScope, CatalogStoreScope, Clock, IdGenerator,
+        OrganizationScopeReader, StoreCatalogRepository, TransactionContext, TransactionManager,
     };
     use async_trait::async_trait;
-    use ordering_food_catalog_domain::{
-        CategoryId, ItemId, StoreCatalog, StoreCatalogId, StoreId,
-    };
-    use ordering_food_organization_published::{BrandRef, StoreSummary};
+    use ordering_food_catalog_domain::{CategoryId, ItemId, StoreCatalog, StoreCatalogId, StoreId};
     use ordering_food_shared_kernel::Timestamp;
     use std::{
         any::Any,
@@ -171,7 +168,7 @@ mod tests {
     }
 
     struct FakeOrganizationScopeReader {
-        store_scope: Option<StoreSummary>,
+        store_scope: Option<CatalogStoreScope>,
     }
 
     impl FakeOrganizationScopeReader {
@@ -181,9 +178,9 @@ mod tests {
 
         fn existing() -> Self {
             Self {
-                store_scope: Some(StoreSummary {
-                    brand_id: "brand-1".to_string(),
+                store_scope: Some(CatalogStoreScope {
                     store_id: "store-1".to_string(),
+                    brand_id: "brand-1".to_string(),
                     slug: "demo-store".to_string(),
                     name: "Demo Store".to_string(),
                     currency_code: "CNY".to_string(),
@@ -196,19 +193,24 @@ mod tests {
 
     #[async_trait]
     impl OrganizationScopeReader for FakeOrganizationScopeReader {
-        async fn get_active_store(&self) -> Result<Option<StoreSummary>, ApplicationError> {
+        async fn get_active_store(&self) -> Result<Option<CatalogStoreScope>, ApplicationError> {
             Ok(self.store_scope.clone())
         }
 
-        async fn get_brand(&self, _brand_id: &str) -> Result<Option<BrandRef>, ApplicationError> {
-            Ok(None)
+        async fn get_brand(
+            &self,
+            _brand_id: &str,
+        ) -> Result<Option<CatalogBrandScope>, ApplicationError> {
+            Ok(Some(CatalogBrandScope {
+                brand_id: "brand-1".to_string(),
+            }))
         }
 
         async fn get_store_scope(
             &self,
             _brand_id: &str,
             _store_id: &str,
-        ) -> Result<Option<StoreSummary>, ApplicationError> {
+        ) -> Result<Option<CatalogStoreScope>, ApplicationError> {
             Ok(self.store_scope.clone())
         }
     }

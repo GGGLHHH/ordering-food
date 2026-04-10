@@ -1,20 +1,19 @@
 use std::{fs, path::Path};
 
 #[test]
-fn catalog_application_manifest_only_depends_on_catalog_domain_platform_kernel_and_published_scope_facts()
- {
+fn catalog_application_manifest_only_depends_on_catalog_domain_and_kernel() {
     let manifest =
         fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();
 
     assert!(manifest.contains("ordering-food-catalog-domain"));
     assert!(manifest.contains("ordering-food-platform-kernel"));
-    assert!(manifest.contains("ordering-food-organization-published"));
 
     let forbidden = [
         "ordering-food-identity-application".to_string(),
         "ordering-food-identity-domain".to_string(),
         format!("ordering-food-{}-application", "menu"),
         format!("ordering-food-{}-domain", "menu"),
+        "ordering-food-organization-published".to_string(),
         "ordering-food-organization-application".to_string(),
         "ordering-food-organization-domain".to_string(),
         "ordering-food-organization-infrastructure".to_string(),
@@ -40,6 +39,7 @@ fn catalog_application_sources_do_not_import_foreign_internal_layers() {
         "src/error.rs",
         "src/lib.rs",
         "src/module.rs",
+        "src/organization_scope.rs",
         "src/ports.rs",
         "src/use_cases/bootstrap_brand_catalog.rs",
         "src/use_cases/attach_store_catalog.rs",
@@ -51,6 +51,7 @@ fn catalog_application_sources_do_not_import_foreign_internal_layers() {
             fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_path)).unwrap();
 
         let forbidden = [
+            "ordering_food_organization_published".to_string(),
             "ordering_food_organization_application".to_string(),
             "ordering_food_organization_domain".to_string(),
             "ordering_food_identity_application".to_string(),

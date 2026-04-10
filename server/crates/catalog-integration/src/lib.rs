@@ -1,15 +1,14 @@
-use async_trait::async_trait;
+mod organization_scope_acl;
+
 use ordering_food_catalog_application::{
     ApplicationError as CatalogApplicationError, BootstrapDefaultCatalogInput,
     BootstrapDefaultCatalogOutcome, BootstrapDefaultCategoryInput, BootstrapDefaultItemInput,
     CatalogModule, Clock as CatalogClock, IdGenerator as CatalogIdGenerator,
-    OrganizationScopeReader,
 };
 use ordering_food_catalog_domain::{BrandCatalogId, CategoryId, ItemId, StoreCatalogId};
 use ordering_food_catalog_infrastructure_sqlx::build_catalog_sqlx_module;
-use ordering_food_organization_published::{
-    BrandLookupGateway, BrandRef, OrganizationCollaborationError, StoreScopeGateway, StoreSummary,
-};
+use organization_scope_acl::CatalogOrganizationScopeAclAdapter;
+use ordering_food_organization_published::{BrandLookupGateway, StoreScopeGateway};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -37,13 +36,13 @@ pub fn build_catalog_context_runtime(
     store_scope_gateway: Arc<dyn StoreScopeGateway>,
     clock: Arc<dyn CatalogClock>,
 ) -> CatalogContextRuntime {
-    let organization_scope_reader = Arc::new(CatalogOrganizationScopeReader::new(
+    let organization_scope_acl = Arc::new(CatalogOrganizationScopeAclAdapter::new(
         brand_lookup_gateway,
         store_scope_gateway,
     ));
     let sqlx_module = build_catalog_sqlx_module(
         pg_pool,
-        organization_scope_reader,
+        organization_scope_acl,
         clock,
         Arc::new(UuidV4CatalogIdGenerator),
     );
@@ -57,7 +56,9 @@ pub async fn seed_default_catalog(
     store_scope_gateway: Arc<dyn StoreScopeGateway>,
     bootstrap: CatalogBootstrap,
 ) -> Result<BootstrapDefaultCatalogOutcome, CatalogApplicationError> {
-    let active_store = require_active_store(store_scope_gateway.as_ref()).await?;
+    let active_store =
+        CatalogOrganizationScopeAclAdapter::require_active_store_scope(store_scope_gateway.as_ref())
+            .await?;
     let input = BootstrapDefaultCatalogInput {
         active_store,
         brand_slug: bootstrap.brand_slug,
@@ -73,15 +74,6 @@ pub async fn seed_default_catalog(
         .await
 }
 
-pub mod organization_scope_adapter {
-    use ordering_food_organization_published::{BrandRef, StoreSummary};
-
-    pub trait CatalogOrganizationScopeAdapter {
-        fn map_brand_ref(&self, brand: BrandRef) -> BrandRef;
-        fn map_store_summary(&self, store: StoreSummary) -> StoreSummary;
-    }
-}
-
 pub mod projection {
     use ordering_food_catalog_published::{CatalogItemRef, CatalogPriceFact, StoreCatalogRef};
 
@@ -89,54 +81,6 @@ pub mod projection {
         fn apply_store_catalog(&self, store_catalog: StoreCatalogRef);
         fn apply_catalog_item(&self, item: CatalogItemRef);
         fn apply_catalog_price(&self, price: CatalogPriceFact);
-    }
-}
-
-struct CatalogOrganizationScopeReader {
-    brand_lookup_gateway: Arc<dyn BrandLookupGateway>,
-    store_scope_gateway: Arc<dyn StoreScopeGateway>,
-}
-
-impl CatalogOrganizationScopeReader {
-    fn new(
-        brand_lookup_gateway: Arc<dyn BrandLookupGateway>,
-        store_scope_gateway: Arc<dyn StoreScopeGateway>,
-    ) -> Self {
-        Self {
-            brand_lookup_gateway,
-            store_scope_gateway,
-        }
-    }
-}
-
-#[async_trait]
-impl OrganizationScopeReader for CatalogOrganizationScopeReader {
-    async fn get_active_store(&self) -> Result<Option<StoreSummary>, CatalogApplicationError> {
-        self.store_scope_gateway
-            .get_active()
-            .await
-            .map_err(map_organization_error)
-    }
-
-    async fn get_brand(&self, brand_id: &str) -> Result<Option<BrandRef>, CatalogApplicationError> {
-        self.brand_lookup_gateway
-            .get_by_id(brand_id)
-            .await
-            .map_err(map_organization_error)
-    }
-
-    async fn get_store_scope(
-        &self,
-        brand_id: &str,
-        store_id: &str,
-    ) -> Result<Option<StoreSummary>, CatalogApplicationError> {
-        let store = self
-            .store_scope_gateway
-            .get_by_id(store_id)
-            .await
-            .map_err(map_organization_error)?;
-
-        Ok(store.filter(|store| store.brand_id == brand_id))
     }
 }
 
@@ -157,37 +101,6 @@ impl CatalogIdGenerator for UuidV4CatalogIdGenerator {
 
     fn next_item_id(&self) -> ItemId {
         ItemId::new(Uuid::new_v4().to_string())
-    }
-}
-
-async fn require_active_store(
-    store_scope_gateway: &dyn StoreScopeGateway,
-) -> Result<StoreSummary, CatalogApplicationError> {
-    store_scope_gateway
-        .get_active()
-        .await
-        .map_err(map_organization_error)?
-        .ok_or_else(|| CatalogApplicationError::not_found("organization store was not found"))
-}
-
-fn map_organization_error(error: OrganizationCollaborationError) -> CatalogApplicationError {
-    match error {
-        OrganizationCollaborationError::Validation { message } => {
-            CatalogApplicationError::validation(message)
-        }
-        OrganizationCollaborationError::NotFound { message } => {
-            CatalogApplicationError::not_found(message)
-        }
-        OrganizationCollaborationError::Conflict { message } => {
-            CatalogApplicationError::conflict(message)
-        }
-        OrganizationCollaborationError::Unexpected { message, details } => match details {
-            Some(source) => CatalogApplicationError::Unexpected {
-                message,
-                source: Some(Box::new(std::io::Error::other(source))),
-            },
-            None => CatalogApplicationError::unexpected(message),
-        },
     }
 }
 

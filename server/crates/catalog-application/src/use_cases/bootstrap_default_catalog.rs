@@ -1,15 +1,14 @@
 use crate::{
     ApplicationError, AttachStoreCatalog, AttachStoreCatalogInput, BootstrapBrandCatalog,
-    BootstrapBrandCatalogInput, BrandCatalogQueryService, CategoryQueryService, CreateCategory,
-    CreateCategoryInput, CreateItem, CreateItemInput, ItemQueryService, StoreCatalogQueryService,
-    UpsertStoreItemListing, UpsertStoreItemListingInput,
+    BootstrapBrandCatalogInput, BrandCatalogQueryService, CatalogStoreScope, CategoryQueryService,
+    CreateCategory, CreateCategoryInput, CreateItem, CreateItemInput, ItemQueryService,
+    StoreCatalogQueryService, UpsertStoreItemListing, UpsertStoreItemListingInput,
 };
-use ordering_food_organization_published::StoreSummary;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BootstrapDefaultCatalogInput {
-    pub active_store: StoreSummary,
+    pub active_store: CatalogStoreScope,
     pub brand_slug: String,
     pub brand_name: String,
     pub categories: Vec<BootstrapDefaultCategoryInput>,
@@ -135,7 +134,7 @@ impl BootstrapDefaultCatalog {
 
     async fn ensure_brand_catalog(
         &self,
-        active_store: &StoreSummary,
+        active_store: &CatalogStoreScope,
         brand_slug: &str,
         brand_name: &str,
     ) -> Result<String, ApplicationError> {
@@ -159,7 +158,7 @@ impl BootstrapDefaultCatalog {
 
     async fn ensure_store_catalog(
         &self,
-        active_store: &StoreSummary,
+        active_store: &CatalogStoreScope,
     ) -> Result<String, ApplicationError> {
         let input = AttachStoreCatalogInput {
             brand_id: active_store.brand_id.clone(),

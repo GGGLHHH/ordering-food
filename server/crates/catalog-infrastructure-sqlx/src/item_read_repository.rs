@@ -182,10 +182,7 @@ impl ItemReadRepository for SqlxItemReadRepository {
         .await
     }
 
-    async fn find_by_id(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<ItemReadModel>, ApplicationError> {
+    async fn find_by_id(&self, item_id: &str) -> Result<Option<ItemReadModel>, ApplicationError> {
         SqlxItemReadRepository::find_by_id(self, item_id).await
     }
 
@@ -195,8 +192,7 @@ impl ItemReadRepository for SqlxItemReadRepository {
         slug: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError> {
         let mut items =
-            SqlxItemReadRepository::list_by_brand_catalog_id(self, brand_catalog_id, None)
-                .await?;
+            SqlxItemReadRepository::list_by_brand_catalog_id(self, brand_catalog_id, None).await?;
         Ok(items
             .drain(..)
             .find(|item| item.slug == slug.trim().to_ascii_lowercase()))
@@ -210,15 +206,13 @@ impl StoreItemListingReadRepository for SqlxItemReadRepository {
         store_catalog_id: &str,
         item_id: &str,
     ) -> Result<Option<StoreItemListingReadModel>, ApplicationError> {
-        SqlxItemReadRepository::find_listing(self, store_catalog_id, item_id)
-            .await
+        SqlxItemReadRepository::find_listing(self, store_catalog_id, item_id).await
     }
 
     async fn list_by_store_catalog_id(
         &self,
         store_catalog_id: &str,
     ) -> Result<Vec<StoreItemListingReadModel>, ApplicationError> {
-        SqlxItemReadRepository::list_listings_by_store_catalog_id(self, store_catalog_id)
-            .await
+        SqlxItemReadRepository::list_listings_by_store_catalog_id(self, store_catalog_id).await
     }
 }

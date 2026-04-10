@@ -1,13 +1,12 @@
 use crate::{
-    ApplicationError, BrandCatalogReadModel, CategoryReadModel, ItemReadModel,
-    StoreCatalogReadModel, StoreItemListingReadModel,
+    ApplicationError, BrandCatalogReadModel, CatalogBrandScope, CatalogStoreScope,
+    CategoryReadModel, ItemReadModel, StoreCatalogReadModel, StoreItemListingReadModel,
 };
 use async_trait::async_trait;
 use ordering_food_catalog_domain::{
     BrandCatalog, BrandCatalogId, BrandId, Category, CategoryId, Item, ItemId, StoreCatalog,
     StoreCatalogId, StoreId, StoreItemListing,
 };
-use ordering_food_organization_published::{BrandRef, StoreSummary};
 pub use ordering_food_platform_kernel::Clock;
 use std::{any::Any, sync::Arc};
 
@@ -32,13 +31,16 @@ pub trait TransactionManager: Send + Sync {
 
 #[async_trait]
 pub trait OrganizationScopeReader: Send + Sync {
-    async fn get_active_store(&self) -> Result<Option<StoreSummary>, ApplicationError>;
-    async fn get_brand(&self, brand_id: &str) -> Result<Option<BrandRef>, ApplicationError>;
+    async fn get_active_store(&self) -> Result<Option<CatalogStoreScope>, ApplicationError>;
+    async fn get_brand(
+        &self,
+        brand_id: &str,
+    ) -> Result<Option<CatalogBrandScope>, ApplicationError>;
     async fn get_store_scope(
         &self,
         brand_id: &str,
         store_id: &str,
-    ) -> Result<Option<StoreSummary>, ApplicationError>;
+    ) -> Result<Option<CatalogStoreScope>, ApplicationError>;
 }
 
 #[async_trait]
@@ -175,8 +177,7 @@ pub trait ItemReadRepository: Send + Sync {
         filter: CatalogItemListFilter,
     ) -> Result<Vec<ItemReadModel>, ApplicationError>;
 
-    async fn find_by_id(&self, item_id: &str)
-    -> Result<Option<ItemReadModel>, ApplicationError>;
+    async fn find_by_id(&self, item_id: &str) -> Result<Option<ItemReadModel>, ApplicationError>;
 
     async fn find_by_slug(
         &self,
@@ -213,18 +214,14 @@ impl BrandCatalogQueryService {
         &self,
         brand_catalog_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError> {
-        self.repository
-            .find_by_id(brand_catalog_id)
-            .await
+        self.repository.find_by_id(brand_catalog_id).await
     }
 
     pub async fn find_by_brand_id(
         &self,
         brand_id: &str,
     ) -> Result<Option<BrandCatalogReadModel>, ApplicationError> {
-        self.repository
-            .find_by_brand_id(brand_id)
-            .await
+        self.repository.find_by_brand_id(brand_id).await
     }
 }
 
@@ -242,24 +239,20 @@ impl StoreCatalogQueryService {
         &self,
         store_catalog_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError> {
-        self.repository
-            .find_by_id(store_catalog_id)
-            .await
+        self.repository.find_by_id(store_catalog_id).await
     }
 
     pub async fn find_by_store_id(
         &self,
         store_id: &str,
     ) -> Result<Option<StoreCatalogReadModel>, ApplicationError> {
-        self.repository
-            .find_by_store_id(store_id)
-            .await
+        self.repository.find_by_store_id(store_id).await
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveCatalogContextReadModel {
-    pub store: StoreSummary,
+    pub store: CatalogStoreScope,
     pub brand_catalog: BrandCatalogReadModel,
     pub store_catalog: StoreCatalogReadModel,
 }
@@ -333,9 +326,7 @@ impl CategoryQueryService {
         brand_catalog_id: &str,
         slug: &str,
     ) -> Result<Option<CategoryReadModel>, ApplicationError> {
-        self.repository
-            .find_by_slug(brand_catalog_id, slug)
-            .await
+        self.repository.find_by_slug(brand_catalog_id, slug).await
     }
 }
 
@@ -371,9 +362,7 @@ impl ItemQueryService {
         brand_catalog_id: &str,
         slug: &str,
     ) -> Result<Option<ItemReadModel>, ApplicationError> {
-        self.repository
-            .find_by_slug(brand_catalog_id, slug)
-            .await
+        self.repository.find_by_slug(brand_catalog_id, slug).await
     }
 }
 
@@ -393,10 +382,7 @@ impl StoreItemListingQueryService {
         item_id: &str,
     ) -> Result<Option<StoreItemListingReadModel>, ApplicationError> {
         self.repository
-            .find_by_item_id(
-                store_catalog_id,
-                item_id,
-            )
+            .find_by_item_id(store_catalog_id, item_id)
             .await
     }
 

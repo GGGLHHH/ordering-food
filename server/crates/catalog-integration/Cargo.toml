@@ -13,4 +13,4 @@ ordering-food-catalog-infrastructure-sqlx = { path = "../catalog-infrastructure-
 ordering-food-catalog-published = { path = "../catalog-published" }
 ordering-food-organization-published = { path = "../organization-published" }
 sqlx.workspace = true
-uuid.workspace = true
+uuid = { workspace = true, features = ["v4"] }

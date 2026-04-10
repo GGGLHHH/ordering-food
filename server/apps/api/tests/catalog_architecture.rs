@@ -98,6 +98,18 @@ fn catalog_application_owns_active_catalog_query_facade() {
 }
 
 #[test]
+fn catalog_application_ports_do_not_expose_organization_published_models() {
+    let application_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/catalog-application/src/ports.rs"),
+    )
+    .unwrap();
+
+    assert!(!application_source.contains("ordering_food_organization_published"));
+    assert!(!application_source.contains("StoreSummary"));
+    assert!(!application_source.contains("BrandRef"));
+}
+
+#[test]
 fn catalog_schema_does_not_hold_cross_context_foreign_keys() {
     let migration_source = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(
         "../../crates/database-infrastructure-sqlx/migrations/202604050301_catalog_context.up.sql",
@@ -105,4 +117,30 @@ fn catalog_schema_does_not_hold_cross_context_foreign_keys() {
     .unwrap();
 
     assert!(!migration_source.contains("REFERENCES organization."));
+}
+
+#[test]
+fn catalog_integration_owns_organization_scope_acl_translation() {
+    let integration_lib_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/catalog-integration/src/lib.rs"),
+    )
+    .unwrap();
+    let integration_acl_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../crates/catalog-integration/src/organization_scope_acl.rs"),
+    )
+    .unwrap();
+
+    assert!(integration_lib_source.contains("mod organization_scope_acl;"));
+    assert!(integration_lib_source.contains("ordering_food_organization_published"));
+    assert!(integration_lib_source.contains("CatalogOrganizationScopeAclAdapter"));
+    assert!(!integration_lib_source.contains("pub mod organization_scope_adapter"));
+    assert!(!integration_lib_source.contains("CatalogOrganizationScopeReader"));
+    assert!(integration_acl_source.contains("CatalogBrandScope"));
+    assert!(integration_acl_source.contains("CatalogStoreScope"));
+    assert!(integration_acl_source.contains("impl OrganizationScopeReader"));
+    assert!(integration_acl_source.contains("BrandLookupGateway"));
+    assert!(integration_acl_source.contains("StoreScopeGateway"));
+    assert!(integration_acl_source.contains("BrandRef"));
+    assert!(integration_acl_source.contains("StoreSummary"));
 }

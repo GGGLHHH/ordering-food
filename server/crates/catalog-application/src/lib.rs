@@ -1,6 +1,7 @@
 mod dto;
 mod error;
 mod module;
+mod organization_scope;
 mod ports;
 pub mod use_cases;
 
@@ -10,6 +11,7 @@ pub use dto::{
 };
 pub use error::ApplicationError;
 pub use module::CatalogModule;
+pub use organization_scope::{CatalogBrandScope, CatalogStoreScope};
 pub use ports::{
     ActiveCatalogContextReadModel, ActiveCatalogQueryService, BrandCatalogQueryService,
     BrandCatalogReadRepository, BrandCatalogRepository, CatalogItemListFilter,
