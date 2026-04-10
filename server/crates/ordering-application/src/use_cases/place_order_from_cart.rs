@@ -1,11 +1,11 @@
 use crate::{
-    ApplicationError, Clock, IdGenerator, OrderPlaced, OrderRepository,
-    OrderingPublishedEventRecorder, TransactionManager,
+    ApplicationError, Clock, IdGenerator, LocalCommercialOrderLineSnapshot,
+    LocalCommercialOrderPlaced, OrderRepository, OrderingEvent, OrderingEventRecorder,
+    TransactionManager,
 };
 use ordering_food_ordering_domain::{
     CatalogItemId, CustomerId, Order, PlaceOrderItemInput as DomainPlaceOrderItemInput, StoreId,
 };
-use ordering_food_ordering_published::OrderPlacedItem;
 use ordering_food_shared_kernel::Identifier;
 use std::sync::Arc;
 
@@ -29,7 +29,7 @@ pub struct PlaceOrderFromCart {
     transaction_manager: Arc<dyn TransactionManager>,
     clock: Arc<dyn Clock>,
     id_generator: Arc<dyn IdGenerator>,
-    event_recorder: Arc<dyn OrderingPublishedEventRecorder>,
+    event_recorder: Arc<dyn OrderingEventRecorder>,
 }
 
 impl PlaceOrderFromCart {
@@ -38,7 +38,7 @@ impl PlaceOrderFromCart {
         transaction_manager: Arc<dyn TransactionManager>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
-        event_recorder: Arc<dyn OrderingPublishedEventRecorder>,
+        event_recorder: Arc<dyn OrderingEventRecorder>,
     ) -> Self {
         Self {
             order_repository,
@@ -49,7 +49,10 @@ impl PlaceOrderFromCart {
         }
     }
 
-    pub async fn execute(&self, input: PlaceOrderFromCartInput) -> Result<String, ApplicationError> {
+    pub async fn execute(
+        &self,
+        input: PlaceOrderFromCartInput,
+    ) -> Result<String, ApplicationError> {
         let order = Order::place(
             self.id_generator.next_order_id(),
             CustomerId::new(input.customer_id),
@@ -73,19 +76,17 @@ impl PlaceOrderFromCart {
             return Err(error);
         }
 
-        let order_placed = OrderPlaced {
+        let event = OrderingEvent::CommercialOrderPlaced(LocalCommercialOrderPlaced {
             order_id: order.id().as_str().to_string(),
             customer_id: order.customer_id().as_str().to_string(),
             store_id: order.store_id().as_str().to_string(),
-            status: order.status().as_str().to_string(),
             subtotal_amount: order.subtotal_amount(),
             total_amount: order.total_amount(),
-            created_at: order.created_at(),
-            updated_at: order.updated_at(),
+            occurred_at: order.updated_at(),
             items: order
                 .items()
                 .iter()
-                .map(|item| OrderPlacedItem {
+                .map(|item| LocalCommercialOrderLineSnapshot {
                     line_number: item.line_number(),
                     catalog_item_id: item.catalog_item_id().as_str().to_string(),
                     name: item.name().to_string(),
@@ -94,13 +95,9 @@ impl PlaceOrderFromCart {
                     line_total_amount: item.line_total_amount(),
                 })
                 .collect(),
-        };
+        });
 
-        if let Err(error) = self
-            .event_recorder
-            .record_order_placed(tx.as_mut(), &order_placed)
-            .await
-        {
+        if let Err(error) = self.event_recorder.record(tx.as_mut(), &event).await {
             self.transaction_manager.rollback(tx).await?;
             return Err(error);
         }
@@ -114,8 +111,7 @@ impl PlaceOrderFromCart {
 mod tests {
     use super::*;
     use crate::{
-        ApplicationError, OrderPlaced, OrderRepository, OrderingPublishedEventRecorder,
-        TransactionContext,
+        ApplicationError, OrderRepository, OrderingEvent, OrderingEventRecorder, TransactionContext,
     };
     use async_trait::async_trait;
     use ordering_food_ordering_domain::{Order, OrderId};
@@ -182,33 +178,21 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingEventRecorder {
-        placed: Mutex<Vec<OrderPlaced>>,
+        events: Mutex<Vec<OrderingEvent>>,
+        fail_record: bool,
     }
 
     #[async_trait]
-    impl OrderingPublishedEventRecorder for RecordingEventRecorder {
-        async fn record_order_placed(
+    impl OrderingEventRecorder for RecordingEventRecorder {
+        async fn record(
             &self,
             _tx: &mut dyn TransactionContext,
-            event: &OrderPlaced,
+            event: &OrderingEvent,
         ) -> Result<(), ApplicationError> {
-            self.placed.lock().unwrap().push(event.clone());
-            Ok(())
-        }
-
-        async fn record_order_commercial_state_changed(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            _event: &crate::OrderCommercialStateChanged,
-        ) -> Result<(), ApplicationError> {
-            Ok(())
-        }
-
-        async fn record_order_cancelled_by_customer(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            _event: &crate::OrderCancelledByCustomer,
-        ) -> Result<(), ApplicationError> {
+            if self.fail_record {
+                return Err(ApplicationError::unexpected("record failed"));
+            }
+            self.events.lock().unwrap().push(event.clone());
             Ok(())
         }
     }
@@ -283,11 +267,25 @@ mod tests {
         assert_eq!(repository.inserted.lock().unwrap().len(), 1);
         assert_eq!(*transactions.committed.lock().unwrap(), 1);
         assert_eq!(*transactions.rolled_back.lock().unwrap(), 0);
-        assert_eq!(event_recorder.placed.lock().unwrap().len(), 1);
-        assert_eq!(
-            event_recorder.placed.lock().unwrap()[0].store_id,
-            "store-1".to_string()
-        );
+        assert_eq!(event_recorder.events.lock().unwrap().len(), 1);
+        let first_event = event_recorder.events.lock().unwrap()[0].clone();
+        let placed = match first_event {
+            OrderingEvent::CommercialOrderPlaced(placed) => placed,
+            _ => panic!("expected CommercialOrderPlaced event"),
+        };
+        assert_eq!(placed.order_id, "generated-order");
+        assert_eq!(placed.customer_id, "customer-1".to_string());
+        assert_eq!(placed.store_id, "store-1".to_string());
+        assert_eq!(placed.subtotal_amount, 6400);
+        assert_eq!(placed.total_amount, 6400);
+        assert_eq!(placed.occurred_at, datetime!(2026-03-15 10:00 UTC));
+        assert_eq!(placed.items.len(), 1);
+        assert_eq!(placed.items[0].line_number, 1);
+        assert_eq!(placed.items[0].catalog_item_id, "item-1");
+        assert_eq!(placed.items[0].name, "Fried Rice");
+        assert_eq!(placed.items[0].unit_price_amount, 3200);
+        assert_eq!(placed.items[0].quantity, 2);
+        assert_eq!(placed.items[0].line_total_amount, 6400);
     }
 
     #[tokio::test]
@@ -325,6 +323,45 @@ mod tests {
         assert!(matches!(error, ApplicationError::Unexpected { .. }));
         assert_eq!(*transactions.committed.lock().unwrap(), 0);
         assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
-        assert!(event_recorder.placed.lock().unwrap().is_empty());
+        assert!(event_recorder.events.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn place_order_rolls_back_when_record_fails() {
+        let repository = Arc::new(FakeOrderRepository::default());
+        let transactions = Arc::new(RecordingTransactionManager::default());
+        let event_recorder = Arc::new(RecordingEventRecorder {
+            events: Mutex::new(Vec::new()),
+            fail_record: true,
+        });
+        let use_case = PlaceOrderFromCart::new(
+            repository.clone(),
+            transactions.clone(),
+            Arc::new(FixedClock {
+                now: datetime!(2026-03-15 10:00 UTC),
+            }),
+            Arc::new(FixedIdGenerator),
+            event_recorder.clone(),
+        );
+
+        let error = use_case
+            .execute(PlaceOrderFromCartInput {
+                customer_id: "customer-1".to_string(),
+                store_id: "store-1".to_string(),
+                items: vec![PlaceOrderItemInput {
+                    catalog_item_id: "item-1".to_string(),
+                    name: "Fried Rice".to_string(),
+                    unit_price_amount: 3200,
+                    quantity: 1,
+                }],
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::Unexpected { .. }));
+        assert_eq!(repository.inserted.lock().unwrap().len(), 1);
+        assert_eq!(*transactions.committed.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
+        assert!(event_recorder.events.lock().unwrap().is_empty());
     }
 }

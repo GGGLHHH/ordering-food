@@ -8,6 +8,8 @@ publish.workspace = true
 [dependencies]
 ordering-food-shared-kernel = { path = "../shared-kernel" }
 serde.workspace = true
+time.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 time.workspace = true

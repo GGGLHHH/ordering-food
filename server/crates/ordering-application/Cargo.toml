@@ -8,12 +8,10 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 ordering-food-ordering-domain = { path = "../ordering-domain" }
-ordering-food-ordering-published = { path = "../ordering-published" }
 ordering-food-platform-kernel = { path = "../platform-kernel" }
 ordering-food-shared-kernel = { path = "../shared-kernel" }
 thiserror.workspace = true
 
 [dev-dependencies]
-async-trait.workspace = true
 time.workspace = true
 tokio.workspace = true

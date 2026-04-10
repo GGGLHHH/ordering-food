@@ -1,6 +1,7 @@
 use crate::{
-    ApplicationError, Clock, OrderCancelledByCustomer, OrderCommercialStateChanged,
-    OrderRepository, OrderingPublishedEventRecorder, TransactionManager,
+    ApplicationError, Clock, LocalCommercialOrderCancelledByCustomer,
+    LocalCommercialOrderStatusChanged, OrderRepository, OrderingEvent, OrderingEventRecorder,
+    TransactionManager,
 };
 use ordering_food_ordering_domain::OrderId;
 use ordering_food_shared_kernel::Identifier;
@@ -16,7 +17,7 @@ pub struct CancelOrderByCustomer {
     order_repository: Arc<dyn OrderRepository>,
     transaction_manager: Arc<dyn TransactionManager>,
     clock: Arc<dyn Clock>,
-    event_recorder: Arc<dyn OrderingPublishedEventRecorder>,
+    event_recorder: Arc<dyn OrderingEventRecorder>,
 }
 
 impl CancelOrderByCustomer {
@@ -24,7 +25,7 @@ impl CancelOrderByCustomer {
         order_repository: Arc<dyn OrderRepository>,
         transaction_manager: Arc<dyn TransactionManager>,
         clock: Arc<dyn Clock>,
-        event_recorder: Arc<dyn OrderingPublishedEventRecorder>,
+        event_recorder: Arc<dyn OrderingEventRecorder>,
     ) -> Self {
         Self {
             order_repository,
@@ -37,11 +38,20 @@ impl CancelOrderByCustomer {
     pub async fn execute(&self, input: CancelOrderByCustomerInput) -> Result<(), ApplicationError> {
         let mut tx = self.transaction_manager.begin().await?;
         let order_id = OrderId::new(input.order_id);
-        let mut order = self
-            .order_repository
-            .find_by_id(tx.as_mut(), &order_id)
-            .await?
-            .ok_or_else(|| ApplicationError::not_found("order was not found"))?;
+        let order = match self.order_repository.find_by_id(tx.as_mut(), &order_id).await {
+            Ok(order) => order,
+            Err(error) => {
+                self.transaction_manager.rollback(tx).await?;
+                return Err(error);
+            }
+        };
+        let mut order = match order {
+            Some(order) => order,
+            None => {
+                self.transaction_manager.rollback(tx).await?;
+                return Err(ApplicationError::not_found("order was not found"));
+            }
+        };
 
         if order.customer_id().as_str() != input.customer_id {
             self.transaction_manager.rollback(tx).await?;
@@ -49,41 +59,40 @@ impl CancelOrderByCustomer {
         }
 
         let previous_status = order.status().as_str().to_string();
-        order.cancel_by_customer(self.clock.now())?;
+        if let Err(error) = order.cancel_by_customer(self.clock.now()) {
+            self.transaction_manager.rollback(tx).await?;
+            return Err(error.into());
+        }
 
         if let Err(error) = self.order_repository.update(tx.as_mut(), &order).await {
             self.transaction_manager.rollback(tx).await?;
             return Err(error);
         }
 
-        let state_changed = OrderCommercialStateChanged {
-            order_id: order_id.as_str().to_string(),
-            customer_id: order.customer_id().as_str().to_string(),
-            store_id: order.store_id().as_str().to_string(),
-            previous_status,
-            current_status: order.status().as_str().to_string(),
-            occurred_at: order.updated_at(),
-        };
-        if let Err(error) = self
-            .event_recorder
-            .record_order_commercial_state_changed(tx.as_mut(), &state_changed)
-            .await
-        {
+        let state_changed = OrderingEvent::CommercialOrderStatusChanged(
+            LocalCommercialOrderStatusChanged {
+                order_id: order_id.as_str().to_string(),
+                customer_id: order.customer_id().as_str().to_string(),
+                store_id: order.store_id().as_str().to_string(),
+                previous_status,
+                current_status: order.status().as_str().to_string(),
+                occurred_at: order.updated_at(),
+            },
+        );
+        if let Err(error) = self.event_recorder.record(tx.as_mut(), &state_changed).await {
             self.transaction_manager.rollback(tx).await?;
             return Err(error);
         }
 
-        let cancelled = OrderCancelledByCustomer {
-            order_id: order_id.as_str().to_string(),
-            customer_id: order.customer_id().as_str().to_string(),
-            store_id: order.store_id().as_str().to_string(),
-            occurred_at: order.updated_at(),
-        };
-        if let Err(error) = self
-            .event_recorder
-            .record_order_cancelled_by_customer(tx.as_mut(), &cancelled)
-            .await
-        {
+        let cancelled = OrderingEvent::CommercialOrderCancelledByCustomer(
+            LocalCommercialOrderCancelledByCustomer {
+                order_id: order_id.as_str().to_string(),
+                customer_id: order.customer_id().as_str().to_string(),
+                store_id: order.store_id().as_str().to_string(),
+                occurred_at: order.updated_at(),
+            },
+        );
+        if let Err(error) = self.event_recorder.record(tx.as_mut(), &cancelled).await {
             self.transaction_manager.rollback(tx).await?;
             return Err(error);
         }
@@ -97,7 +106,7 @@ impl CancelOrderByCustomer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{OrderingPublishedEventRecorder, TransactionContext};
+    use crate::{OrderingEvent, OrderingEventRecorder, TransactionContext};
     use async_trait::async_trait;
     use ordering_food_ordering_domain::{
         CatalogItemId, CustomerId, Order, OrderStatus, PlaceOrderItemInput, StoreId,
@@ -157,50 +166,91 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingEventRecorder {
-        commercial_state_changes: Mutex<Vec<crate::OrderCommercialStateChanged>>,
-        cancelled: Mutex<Vec<crate::OrderCancelledByCustomer>>,
+        events: Mutex<Vec<OrderingEvent>>,
     }
 
     #[async_trait]
-    impl OrderingPublishedEventRecorder for RecordingEventRecorder {
-        async fn record_order_placed(
+    impl OrderingEventRecorder for RecordingEventRecorder {
+        async fn record(
             &self,
             _tx: &mut dyn TransactionContext,
-            _event: &crate::OrderPlaced,
+            event: &OrderingEvent,
         ) -> Result<(), ApplicationError> {
+            self.events.lock().unwrap().push(event.clone());
             Ok(())
         }
+    }
 
-        async fn record_order_commercial_state_changed(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            event: &crate::OrderCommercialStateChanged,
-        ) -> Result<(), ApplicationError> {
-            self.commercial_state_changes
-                .lock()
-                .unwrap()
-                .push(event.clone());
-            Ok(())
+    #[derive(Default)]
+    struct FailingRecordingEventRecorder {
+        events: Mutex<Vec<OrderingEvent>>,
+        call_count: Mutex<usize>,
+        fail_on_call: Option<usize>,
+    }
+
+    impl FailingRecordingEventRecorder {
+        fn new(fail_on_call: Option<usize>) -> Self {
+            Self {
+                events: Mutex::new(Vec::new()),
+                call_count: Mutex::new(0),
+                fail_on_call,
+            }
         }
 
-        async fn record_order_cancelled_by_customer(
+        fn failing_on(call_index: usize) -> Self {
+            Self::new(Some(call_index))
+        }
+
+        fn recorded_events(&self) -> Vec<OrderingEvent> {
+            self.events.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl OrderingEventRecorder for FailingRecordingEventRecorder {
+        async fn record(
             &self,
             _tx: &mut dyn TransactionContext,
-            event: &crate::OrderCancelledByCustomer,
+            event: &OrderingEvent,
         ) -> Result<(), ApplicationError> {
-            self.cancelled.lock().unwrap().push(event.clone());
+            let call_index = {
+                let mut guard = self.call_count.lock().unwrap();
+                *guard += 1;
+                *guard
+            };
+
+            if self.fail_on_call == Some(call_index) {
+                return Err(ApplicationError::unexpected(format!(
+                    "record failure triggered for call {}",
+                    call_index
+                )));
+            }
+
+            self.events.lock().unwrap().push(event.clone());
             Ok(())
         }
     }
 
     struct FakeOrderRepository {
         order: Mutex<Option<Order>>,
+        fail_find: bool,
+        fail_update: bool,
     }
 
     impl FakeOrderRepository {
         fn with_order(order: Order) -> Self {
             Self {
                 order: Mutex::new(Some(order)),
+                fail_find: false,
+                fail_update: false,
+            }
+        }
+
+        fn without_order() -> Self {
+            Self {
+                order: Mutex::new(None),
+                fail_find: false,
+                fail_update: false,
             }
         }
     }
@@ -212,6 +262,9 @@ mod tests {
             _tx: &mut dyn TransactionContext,
             _order_id: &OrderId,
         ) -> Result<Option<Order>, ApplicationError> {
+            if self.fail_find {
+                return Err(ApplicationError::unexpected("find failed"));
+            }
             Ok(self.order.lock().unwrap().clone())
         }
 
@@ -228,6 +281,9 @@ mod tests {
             _tx: &mut dyn TransactionContext,
             order: &Order,
         ) -> Result<(), ApplicationError> {
+            if self.fail_update {
+                return Err(ApplicationError::unexpected("update failed"));
+            }
             *self.order.lock().unwrap() = Some(order.clone());
             Ok(())
         }
@@ -284,7 +340,7 @@ mod tests {
         assert!(matches!(error, ApplicationError::NotFound { .. }));
         assert_eq!(*transactions.committed.lock().unwrap(), 0);
         assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
-        assert!(event_recorder.cancelled.lock().unwrap().is_empty());
+        assert!(event_recorder.events.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -317,15 +373,28 @@ mod tests {
         );
         assert_eq!(*transactions.committed.lock().unwrap(), 1);
         assert_eq!(*transactions.rolled_back.lock().unwrap(), 0);
-        assert_eq!(event_recorder.cancelled.lock().unwrap().len(), 1);
-        assert_eq!(
-            event_recorder
-                .commercial_state_changes
-                .lock()
-                .unwrap()
-                .len(),
-            1
-        );
+        let events = event_recorder.events.lock().unwrap();
+        assert_eq!(events.len(), 2);
+
+        let status_changed = match &events[0] {
+            OrderingEvent::CommercialOrderStatusChanged(event) => event,
+            _ => panic!("expected CommercialOrderStatusChanged as first event"),
+        };
+        assert_eq!(status_changed.order_id, "order-1");
+        assert_eq!(status_changed.customer_id, "customer-1");
+        assert_eq!(status_changed.store_id, "store-1");
+        assert_eq!(status_changed.previous_status, "placed");
+        assert_eq!(status_changed.current_status, "cancelled_by_customer");
+        assert_eq!(status_changed.occurred_at, datetime!(2026-03-15 10:05 UTC));
+
+        let cancelled = match &events[1] {
+            OrderingEvent::CommercialOrderCancelledByCustomer(event) => event,
+            _ => panic!("expected CommercialOrderCancelledByCustomer as second event"),
+        };
+        assert_eq!(cancelled.order_id, "order-1");
+        assert_eq!(cancelled.customer_id, "customer-1");
+        assert_eq!(cancelled.store_id, "store-1");
+        assert_eq!(cancelled.occurred_at, datetime!(2026-03-15 10:05 UTC));
     }
 
     #[tokio::test]
@@ -353,8 +422,168 @@ mod tests {
             .unwrap_err();
 
         assert!(matches!(error, ApplicationError::Conflict { .. }));
-        assert!(event_recorder.cancelled.lock().unwrap().is_empty());
+        assert!(event_recorder.events.lock().unwrap().is_empty());
         assert_eq!(*transactions.committed.lock().unwrap(), 0);
-        assert_eq!(*transactions.rolled_back.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_rolls_back_when_order_not_found() {
+        let repository = Arc::new(FakeOrderRepository::without_order());
+        let transactions = Arc::new(RecordingTransactionManager::default());
+        let event_recorder = Arc::new(RecordingEventRecorder::default());
+        let use_case = CancelOrderByCustomer::new(
+            repository,
+            transactions.clone(),
+            Arc::new(FixedClock {
+                now: datetime!(2026-03-15 10:05 UTC),
+            }),
+            event_recorder.clone(),
+        );
+
+        let error = use_case
+            .execute(CancelOrderByCustomerInput {
+                order_id: "missing-order".to_string(),
+                customer_id: "customer-1".to_string(),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::NotFound { .. }));
+        assert!(event_recorder.events.lock().unwrap().is_empty());
+        assert_eq!(*transactions.committed.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_rolls_back_when_lookup_fails() {
+        let repository = Arc::new(FakeOrderRepository {
+            order: Mutex::new(None),
+            fail_find: true,
+            fail_update: false,
+        });
+        let transactions = Arc::new(RecordingTransactionManager::default());
+        let event_recorder = Arc::new(RecordingEventRecorder::default());
+        let use_case = CancelOrderByCustomer::new(
+            repository,
+            transactions.clone(),
+            Arc::new(FixedClock {
+                now: datetime!(2026-03-15 10:05 UTC),
+            }),
+            event_recorder.clone(),
+        );
+
+        let error = use_case
+            .execute(CancelOrderByCustomerInput {
+                order_id: "order-1".to_string(),
+                customer_id: "customer-1".to_string(),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::Unexpected { .. }));
+        assert!(event_recorder.events.lock().unwrap().is_empty());
+        assert_eq!(*transactions.committed.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_rolls_back_when_update_fails() {
+        let repository = Arc::new(FakeOrderRepository {
+            order: Mutex::new(Some(make_order(OrderStatus::Placed))),
+            fail_find: false,
+            fail_update: true,
+        });
+        let transactions = Arc::new(RecordingTransactionManager::default());
+        let event_recorder = Arc::new(RecordingEventRecorder::default());
+        let use_case = CancelOrderByCustomer::new(
+            repository,
+            transactions.clone(),
+            Arc::new(FixedClock {
+                now: datetime!(2026-03-15 10:05 UTC),
+            }),
+            event_recorder.clone(),
+        );
+
+        let error = use_case
+            .execute(CancelOrderByCustomerInput {
+                order_id: "order-1".to_string(),
+                customer_id: "customer-1".to_string(),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::Unexpected { .. }));
+        assert!(event_recorder.events.lock().unwrap().is_empty());
+        assert_eq!(*transactions.committed.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_rolls_back_when_first_event_record_fails() {
+        let repository = Arc::new(FakeOrderRepository::with_order(make_order(
+            OrderStatus::Placed,
+        )));
+        let transactions = Arc::new(RecordingTransactionManager::default());
+        let event_recorder = Arc::new(FailingRecordingEventRecorder::failing_on(1));
+        let use_case = CancelOrderByCustomer::new(
+            repository,
+            transactions.clone(),
+            Arc::new(FixedClock {
+                now: datetime!(2026-03-15 10:05 UTC),
+            }),
+            event_recorder.clone(),
+        );
+
+        let error = use_case
+            .execute(CancelOrderByCustomerInput {
+                order_id: "order-1".to_string(),
+                customer_id: "customer-1".to_string(),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::Unexpected { .. }));
+        assert_eq!(event_recorder.recorded_events().len(), 0);
+        assert_eq!(*transactions.committed.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancel_order_rolls_back_when_second_event_record_fails() {
+        let repository = Arc::new(FakeOrderRepository::with_order(make_order(
+            OrderStatus::Placed,
+        )));
+        let transactions = Arc::new(RecordingTransactionManager::default());
+        let event_recorder = Arc::new(FailingRecordingEventRecorder::failing_on(2));
+        let use_case = CancelOrderByCustomer::new(
+            repository,
+            transactions.clone(),
+            Arc::new(FixedClock {
+                now: datetime!(2026-03-15 10:05 UTC),
+            }),
+            event_recorder.clone(),
+        );
+
+        let error = use_case
+            .execute(CancelOrderByCustomerInput {
+                order_id: "order-1".to_string(),
+                customer_id: "customer-1".to_string(),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, ApplicationError::Unexpected { .. }));
+        let events = event_recorder.recorded_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            OrderingEvent::CommercialOrderStatusChanged(event) => {
+                assert_eq!(event.order_id, "order-1");
+                assert_eq!(event.customer_id, "customer-1");
+            }
+            _ => panic!("expected CommercialOrderStatusChanged as first event"),
+        }
+        assert_eq!(*transactions.committed.lock().unwrap(), 0);
+        assert_eq!(*transactions.rolled_back.lock().unwrap(), 1);
     }
 }

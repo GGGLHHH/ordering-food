@@ -1,9 +1,6 @@
-use crate::{ApplicationError, OrderListItemReadModel, OrderReadModel};
+use crate::{ApplicationError, OrderListItemReadModel, OrderReadModel, OrderingEvent};
 use async_trait::async_trait;
 use ordering_food_ordering_domain::{Order, OrderId};
-pub use ordering_food_ordering_published::{
-    OrderCancelledByCustomer, OrderCommercialStateChanged, OrderPlaced,
-};
 pub use ordering_food_platform_kernel::Clock;
 use std::{any::Any, sync::Arc};
 
@@ -46,10 +43,7 @@ pub trait OrderRepository: Send + Sync {
 
 #[async_trait]
 pub trait OrderReadRepository: Send + Sync {
-    async fn get_by_id(
-        &self,
-        order_id: &str,
-    ) -> Result<Option<OrderReadModel>, ApplicationError>;
+    async fn get_by_id(&self, order_id: &str) -> Result<Option<OrderReadModel>, ApplicationError>;
 
     async fn list_by_customer(
         &self,
@@ -58,23 +52,11 @@ pub trait OrderReadRepository: Send + Sync {
 }
 
 #[async_trait]
-pub trait OrderingPublishedEventRecorder: Send + Sync {
-    async fn record_order_placed(
+pub trait OrderingEventRecorder: Send + Sync {
+    async fn record(
         &self,
         tx: &mut dyn TransactionContext,
-        event: &OrderPlaced,
-    ) -> Result<(), ApplicationError>;
-
-    async fn record_order_commercial_state_changed(
-        &self,
-        tx: &mut dyn TransactionContext,
-        event: &OrderCommercialStateChanged,
-    ) -> Result<(), ApplicationError>;
-
-    async fn record_order_cancelled_by_customer(
-        &self,
-        tx: &mut dyn TransactionContext,
-        event: &OrderCancelledByCustomer,
+        event: &OrderingEvent,
     ) -> Result<(), ApplicationError>;
 }
 
@@ -93,6 +75,23 @@ impl OrderQueryService {
         order_id: &str,
     ) -> Result<Option<OrderReadModel>, ApplicationError> {
         self.repository.get_by_id(order_id).await
+    }
+
+    pub async fn get_by_id_for_customer(
+        &self,
+        order_id: &str,
+        customer_id: &str,
+    ) -> Result<OrderReadModel, ApplicationError> {
+        let order = self
+            .get_by_id(order_id)
+            .await?
+            .ok_or_else(|| ApplicationError::not_found("order was not found"))?;
+
+        if order.customer_id != customer_id {
+            return Err(ApplicationError::not_found("order was not found"));
+        }
+
+        Ok(order)
     }
 
     pub async fn list_by_customer(

@@ -1517,7 +1517,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "ordering-food-ordering-domain",
- "ordering-food-ordering-published",
  "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "thiserror",
@@ -1553,11 +1552,17 @@ dependencies = [
 [[package]]
 name = "ordering-food-ordering-integration"
 version = "0.1.0"
+ "async-trait",
 dependencies = [
  "ordering-food-ordering-application",
  "ordering-food-ordering-domain",
+ "ordering-food-ordering-published",
  "ordering-food-ordering-infrastructure-sqlx",
+ "ordering-food-shared-kernel",
+ "serde",
+ "serde_json",
  "ordering-food-platform-kernel",
+ "time",
  "sqlx",
  "uuid",
 ]
@@ -1567,6 +1572,7 @@ name = "ordering-food-ordering-published"
 version = "0.1.0"
 dependencies = [
  "ordering-food-shared-kernel",
+ "serde_json",
  "serde",
  "time",
 ]

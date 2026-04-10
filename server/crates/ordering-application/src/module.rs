@@ -1,6 +1,6 @@
 use crate::{
     CancelOrderByCustomer, Clock, IdGenerator, OrderQueryService, OrderReadRepository,
-    OrderRepository, OrderingPublishedEventRecorder, PlaceOrderFromCart, TransactionManager,
+    OrderRepository, OrderingEventRecorder, PlaceOrderFromCart, TransactionManager,
 };
 use std::sync::Arc;
 
@@ -18,7 +18,7 @@ impl OrderingModule {
         transaction_manager: Arc<dyn TransactionManager>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
-        event_recorder: Arc<dyn OrderingPublishedEventRecorder>,
+        event_recorder: Arc<dyn OrderingEventRecorder>,
     ) -> Self {
         Self {
             place_order_from_cart: Arc::new(PlaceOrderFromCart::new(

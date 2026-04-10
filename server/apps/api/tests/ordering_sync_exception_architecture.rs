@@ -8,9 +8,16 @@ fn read_source(relative_path: &str) -> String {
 fn ordering_published_exposes_event_language_instead_of_temporary_sync_gateways() {
     let source = read_source("../../crates/ordering-published/src/lib.rs");
 
-    assert!(source.contains("OrderPlaced"));
-    assert!(source.contains("OrderCommercialStateChanged"));
-    assert!(source.contains("OrderCancelledByCustomer"));
+    assert!(source.contains("pub const COMMERCIAL_ORDER_PLACED_EVENT_TYPE"));
+    assert!(source.contains("pub const COMMERCIAL_ORDER_STATUS_CHANGED_EVENT_TYPE"));
+    assert!(source.contains("pub const COMMERCIAL_ORDER_CANCELLED_BY_CUSTOMER_EVENT_TYPE"));
+    assert!(source.contains("pub struct CommercialOrderLineSnapshotV1"));
+    assert!(source.contains("pub struct CommercialOrderPlacedV1"));
+    assert!(source.contains("pub struct CommercialOrderStatusChangedV1"));
+    assert!(source.contains("pub struct CommercialOrderCancelledByCustomerV1"));
+    assert!(!source.contains("pub struct OrderPlaced"));
+    assert!(!source.contains("pub struct OrderCommercialStateChanged"));
+    assert!(!source.contains("pub struct OrderCancelledByCustomer"));
     assert!(!source.contains("CommercialOrderReadGateway"));
     assert!(!source.contains("CommercialOrderSnapshot"));
     assert!(!source.contains("CommercialOrderItemSnapshot"));
@@ -23,13 +30,13 @@ fn ordering_published_exposes_event_language_instead_of_temporary_sync_gateways(
 #[test]
 fn target_architecture_doc_requires_phase_3_event_and_projection_path() {
     let source = read_source(
-        "../../../docs/superpowers/specs/2026-04-05-backend-ddd-target-architecture-design.md",
+        "../../../docs/superpowers/specs/2026-04-09-server-ddd-purity-remediation-design.md",
     );
 
-    assert!(source.contains("Phase 3"));
-    assert!(source.contains("事件协作替换"));
-    assert!(source.contains("Postgres outbox"));
-    assert!(source.contains("dispatcher / projector"));
+    assert!(source.contains("长期目标态整改"));
+    assert!(source.contains("integration runner 拉取 outbox 消息"));
+    assert!(source.contains("application handler 在事务中完成本地投影更新"));
+    assert!(source.contains("projector"));
     assert!(source.contains("本地投影"));
 }
 
@@ -53,17 +60,31 @@ fn ordering_context_no_longer_wires_fulfillment_sync_bootstrap() {
 }
 
 #[test]
-fn ordering_application_records_published_events_inside_local_transaction() {
-    let ordering_application =
-        read_source("../../crates/ordering-application/src/use_cases/place_order_from_cart.rs");
-    let ordering_cancellation =
-        read_source("../../crates/ordering-application/src/use_cases/cancel_order_by_customer.rs");
+fn ordering_application_no_longer_reexports_published_events() {
+    let application_lib = read_source("../../crates/ordering-application/src/lib.rs");
+    let application_ports = read_source("../../crates/ordering-application/src/ports.rs");
+    let integration_lib = read_source("../../crates/ordering-integration/src/lib.rs");
 
-    assert!(ordering_application.contains("record_order_placed"));
-    assert!(ordering_cancellation.contains("record_order_commercial_state_changed"));
-    assert!(ordering_cancellation.contains("record_order_cancelled_by_customer"));
-    assert!(!ordering_application.contains("bootstrap_order_placed"));
-    assert!(!ordering_cancellation.contains("bootstrap_order_cancelled_by_customer"));
+    assert!(!application_lib.contains("ordering_food_ordering_published"));
+    assert!(!application_lib.contains("CommercialOrderPlacedV1"));
+    assert!(!application_lib.contains("CommercialOrderStatusChangedV1"));
+    assert!(!application_lib.contains("CommercialOrderCancelledByCustomerV1"));
+    assert!(!application_lib.contains("COMMERCIAL_ORDER_PLACED_EVENT_TYPE"));
+    assert!(!application_lib.contains("COMMERCIAL_ORDER_STATUS_CHANGED_EVENT_TYPE"));
+    assert!(!application_lib.contains("COMMERCIAL_ORDER_CANCELLED_BY_CUSTOMER_EVENT_TYPE"));
+    assert!(!application_ports.contains("ordering_food_ordering_published"));
+    assert!(!application_ports.contains("CommercialOrderPlacedV1"));
+    assert!(!application_ports.contains("CommercialOrderStatusChangedV1"));
+    assert!(!application_ports.contains("CommercialOrderCancelledByCustomerV1"));
+    assert!(!application_ports.contains("COMMERCIAL_ORDER_PLACED_EVENT_TYPE"));
+    assert!(!application_ports.contains("COMMERCIAL_ORDER_STATUS_CHANGED_EVENT_TYPE"));
+    assert!(!application_ports.contains("COMMERCIAL_ORDER_CANCELLED_BY_CUSTOMER_EVENT_TYPE"));
+    assert!(application_lib.contains("LocalCommercialOrderPlaced"));
+    assert!(application_lib.contains("LocalCommercialOrderStatusChanged"));
+    assert!(application_lib.contains("LocalCommercialOrderCancelledByCustomer"));
+    assert!(application_lib.contains("OrderingEvent"));
+    assert!(integration_lib.contains("published_event_adapter"));
+    assert!(integration_lib.contains("AdapterBackedOrderingEventRecorder"));
 }
 
 #[test]

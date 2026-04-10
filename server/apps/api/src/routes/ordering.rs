@@ -165,7 +165,7 @@ pub async fn place_order(
     let response = load_order_response(
         &module.order_queries(),
         &order_id,
-        None,
+        &subject.subject_id,
         context.request_id,
     )
     .await?;
@@ -235,7 +235,7 @@ pub async fn get_order(
     let response = load_order_response(
         &module.order_queries(),
         &path.order_id,
-        Some(&subject.subject_id),
+        &subject.subject_id,
         context.request_id,
     )
     .await?;
@@ -274,7 +274,7 @@ pub async fn cancel_order(
     let response = load_order_response(
         &module.order_queries(),
         &path.order_id,
-        Some(&subject.subject_id),
+        &subject.subject_id,
         context.request_id,
     )
     .await?;
@@ -285,20 +285,13 @@ pub async fn cancel_order(
 pub(crate) async fn load_order_response(
     order_queries: &OrderQueryService,
     order_id: &str,
-    customer_id: Option<&str>,
+    customer_id: &str,
     request_id: Option<String>,
 ) -> Result<OrderResponse, AppError> {
     let order = order_queries
-        .get_by_id(order_id)
+        .get_by_id_for_customer(order_id, customer_id)
         .await
-        .map_err(|error| map_ordering_error(error, request_id.clone()))?
-        .ok_or_else(|| {
-            AppError::not_found("order was not found").with_request_id(request_id.clone())
-        })?;
-
-    if customer_id.is_some_and(|customer_id| customer_id != order.customer_id) {
-        return Err(AppError::not_found("order was not found").with_request_id(request_id));
-    }
+        .map_err(|error| map_ordering_error(error, request_id.clone()))?;
 
     map_order_response(order).map_err(|error| error.with_request_id(request_id))
 }
@@ -376,9 +369,9 @@ mod tests {
         AccessTokenVerifier, AuthenticatedSubjectRef, IdentityCollaborationError,
     };
     use ordering_food_ordering_application::{
-        ApplicationError, OrderItemReadModel, OrderListItemReadModel, OrderPlaced,
-        OrderReadRepository, OrderRepository, OrderingPublishedEventRecorder, TransactionContext,
-        TransactionManager,
+        ApplicationError, LocalCommercialOrderCancelledByCustomer, LocalCommercialOrderPlaced,
+        OrderItemReadModel, OrderListItemReadModel, OrderReadRepository, OrderRepository,
+        OrderingEvent, OrderingEventRecorder, TransactionContext, TransactionManager,
     };
     use ordering_food_ordering_domain::{
         CatalogItemId, CustomerId, Order, OrderId, OrderStatus, PlaceOrderItemInput, StoreId,
@@ -563,35 +556,26 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingEventRecorder {
-        placed: Mutex<Vec<OrderPlaced>>,
-        cancelled: Mutex<Vec<ordering_food_ordering_application::OrderCancelledByCustomer>>,
+        placed: Mutex<Vec<LocalCommercialOrderPlaced>>,
+        cancelled: Mutex<Vec<LocalCommercialOrderCancelledByCustomer>>,
     }
 
     #[async_trait]
-    impl OrderingPublishedEventRecorder for RecordingEventRecorder {
-        async fn record_order_placed(
+    impl OrderingEventRecorder for RecordingEventRecorder {
+        async fn record(
             &self,
             _tx: &mut dyn TransactionContext,
-            event: &OrderPlaced,
+            event: &OrderingEvent,
         ) -> Result<(), ApplicationError> {
-            self.placed.lock().unwrap().push(event.clone());
-            Ok(())
-        }
-
-        async fn record_order_commercial_state_changed(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            _event: &ordering_food_ordering_application::OrderCommercialStateChanged,
-        ) -> Result<(), ApplicationError> {
-            Ok(())
-        }
-
-        async fn record_order_cancelled_by_customer(
-            &self,
-            _tx: &mut dyn TransactionContext,
-            event: &ordering_food_ordering_application::OrderCancelledByCustomer,
-        ) -> Result<(), ApplicationError> {
-            self.cancelled.lock().unwrap().push(event.clone());
+            match event {
+                OrderingEvent::CommercialOrderPlaced(event) => {
+                    self.placed.lock().unwrap().push(event.clone());
+                }
+                OrderingEvent::CommercialOrderCancelledByCustomer(event) => {
+                    self.cancelled.lock().unwrap().push(event.clone());
+                }
+                OrderingEvent::CommercialOrderStatusChanged(_) => {}
+            }
             Ok(())
         }
     }
@@ -679,7 +663,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn place_order_returns_snapshot_and_records_published_event() {
+    async fn place_order_returns_snapshot_and_records_local_event() {
         let event_recorder = Arc::new(RecordingEventRecorder::default());
         let app = build_test_app(
             Arc::new(InMemoryOrderRepository::default()),
@@ -764,5 +748,30 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response_json(response).await;
         assert_eq!(body["status"], "placed");
+    }
+
+    #[tokio::test]
+    async fn cancel_order_returns_customer_scoped_snapshot() {
+        let repository = Arc::new(InMemoryOrderRepository::default());
+        repository.seed_order(make_order("order-1", "customer-1", OrderStatus::Placed));
+        let app = build_test_app(repository, Arc::new(RecordingEventRecorder::default()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/orders/order-1/cancel")
+                    .header("cookie", "access_token=token-customer-1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response_json(response).await;
+        assert_eq!(body["order_id"], "order-1");
+        assert_eq!(body["customer_id"], "customer-1");
+        assert_eq!(body["status"], "cancelled_by_customer");
     }
 }

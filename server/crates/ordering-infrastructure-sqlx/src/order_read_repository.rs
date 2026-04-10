@@ -25,10 +25,7 @@ impl SqlxOrderReadRepository {
 
 #[async_trait]
 impl OrderReadRepository for SqlxOrderReadRepository {
-    async fn get_by_id(
-        &self,
-        order_id: &str,
-    ) -> Result<Option<OrderReadModel>, ApplicationError> {
+    async fn get_by_id(&self, order_id: &str) -> Result<Option<OrderReadModel>, ApplicationError> {
         let order_id = Self::parse_order_id(order_id)?;
         let row = sqlx::query(
             r#"

@@ -89,3 +89,16 @@ fn ordering_context_bootstraps_runtime_through_integration_boundary() {
     assert!(!source.contains("build_ordering_module"));
     assert!(!source.contains("UuidV4OrderIdGenerator"));
 }
+
+#[test]
+fn ordering_route_does_not_hold_customer_visibility_logic() {
+    let source =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/routes/ordering.rs"))
+            .unwrap();
+    let production_source = source.split("#[cfg(test)]").next().unwrap_or(&source);
+
+    assert!(production_source.contains("get_by_id_for_customer"));
+    assert!(!production_source.contains("customer_id.is_some_and"));
+    assert!(!production_source.contains("customer_id != order.customer_id"));
+    assert!(!production_source.contains(".get_by_id(order_id)"));
+}

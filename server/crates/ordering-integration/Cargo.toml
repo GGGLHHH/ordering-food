@@ -6,9 +6,18 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+async-trait.workspace = true
 ordering-food-ordering-application = { path = "../ordering-application" }
 ordering-food-ordering-domain = { path = "../ordering-domain" }
 ordering-food-ordering-infrastructure-sqlx = { path = "../ordering-infrastructure-sqlx" }
+ordering-food-ordering-published = { path = "../ordering-published" }
 ordering-food-platform-kernel = { path = "../platform-kernel" }
+ordering-food-shared-kernel = { path = "../shared-kernel" }
+serde.workspace = true
+serde_json.workspace = true
 sqlx.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+time.workspace = true
