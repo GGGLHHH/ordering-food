@@ -47,10 +47,11 @@ fn access_context_bootstraps_access_service_instead_of_app_shell() {
 }
 
 #[test]
-fn fulfillment_route_depends_on_access_published_contract() {
+fn fulfillment_route_does_not_depend_on_access_published_contract() {
     let route_source = read_source("src/routes/fulfillment.rs");
 
-    assert!(route_source.contains("ordering_food_access_published"));
+    assert!(!route_source.contains("ordering_food_access_published"));
+    assert!(!route_source.contains("OrderManagementAccessGateway"));
     assert!(!route_source.contains("ordering_food_access_application::AccessService"));
 }
 
@@ -64,4 +65,16 @@ fn fulfillment_context_consumes_access_published_capability() {
     assert!(context_source.contains("OrderManagementAccessGateway"));
     assert!(!context_source.contains("build_access_service("));
     assert!(!context_source.contains("build_access_decision_gateway"));
+}
+
+#[test]
+fn fulfillment_application_does_not_own_projector_transport_contracts() {
+    let application_source = read_source("../../crates/fulfillment-application/src/ports.rs");
+
+    for forbidden in ["OutboxMessage", "ProjectionCheckpointStore", "serde_json::Value"] {
+        assert!(
+            !application_source.contains(forbidden),
+            "fulfillment application must not expose projector transport type {forbidden}"
+        );
+    }
 }
