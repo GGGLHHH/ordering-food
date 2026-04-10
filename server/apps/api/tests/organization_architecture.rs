@@ -80,3 +80,21 @@ fn organization_published_gateways_use_provider_query_facades() {
     assert!(organization_source.contains("runtime.brand_lookup_gateway"));
     assert!(!organization_source.contains("build_brand_lookup_gateway(pg_pool)"));
 }
+
+#[test]
+fn organization_integration_maps_internal_read_models_to_published_contracts() {
+    let dto_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../crates/organization-application/src/dto.rs"),
+    )
+    .unwrap();
+    let integration_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../crates/organization-integration/src/lib.rs"),
+    )
+    .unwrap();
+
+    assert!(!dto_source.contains("ordering_food_organization_published"));
+    assert!(integration_source.contains("map_brand_ref"));
+    assert!(integration_source.contains("map_store_summary"));
+}

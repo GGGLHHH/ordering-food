@@ -1,8 +1,9 @@
 use async_trait::async_trait;
 use ordering_food_organization_application::{
     ApplicationError as OrganizationApplicationError, BrandQueryService,
-    EnsureDefaultOrganizationInput, EnsureDefaultOrganizationOutcome,
-    IdGenerator as OrganizationIdGenerator, OrganizationModule, StoreQueryService,
+    BrandReadModel as OrganizationBrandReadModel, EnsureDefaultOrganizationInput,
+    EnsureDefaultOrganizationOutcome, IdGenerator as OrganizationIdGenerator, OrganizationModule,
+    StoreQueryService, StoreReadModel as OrganizationStoreReadModel,
 };
 use ordering_food_organization_domain::{BrandId, StoreId};
 use ordering_food_organization_infrastructure_sqlx::build_organization_module;
@@ -120,20 +121,24 @@ impl SqlxBrandLookupGateway {
 #[async_trait]
 impl StoreScopeGateway for SqlxStoreScopeGateway {
     async fn get_active(&self) -> Result<Option<StoreSummary>, OrganizationCollaborationError> {
-        self.store_queries
+        let store = self
+            .store_queries
             .get_active()
             .await
-            .map_err(map_organization_application_error)
+            .map_err(map_organization_application_error)?;
+        Ok(store.map(map_store_summary))
     }
 
     async fn get_by_id(
         &self,
         store_id: &str,
     ) -> Result<Option<StoreSummary>, OrganizationCollaborationError> {
-        self.store_queries
+        let store = self
+            .store_queries
             .get_by_id(store_id)
             .await
-            .map_err(map_organization_application_error)
+            .map_err(map_organization_application_error)?;
+        Ok(store.map(map_store_summary))
     }
 }
 
@@ -143,10 +148,12 @@ impl BrandLookupGateway for SqlxBrandLookupGateway {
         &self,
         brand_id: &str,
     ) -> Result<Option<BrandRef>, OrganizationCollaborationError> {
-        self.brand_queries
+        let brand = self
+            .brand_queries
             .get_by_id(brand_id)
             .await
-            .map_err(map_organization_application_error)
+            .map_err(map_organization_application_error)?;
+        Ok(brand.map(map_brand_ref))
     }
 }
 
@@ -161,6 +168,24 @@ fn default_organization_input() -> EnsureDefaultOrganizationInput {
         store_currency_code: "CNY".to_string(),
         store_timezone: "Asia/Shanghai".to_string(),
         store_status: "active".to_string(),
+    }
+}
+
+fn map_brand_ref(brand: OrganizationBrandReadModel) -> BrandRef {
+    BrandRef {
+        brand_id: brand.brand_id,
+    }
+}
+
+fn map_store_summary(store: OrganizationStoreReadModel) -> StoreSummary {
+    StoreSummary {
+        store_id: store.store_id,
+        brand_id: store.brand_id,
+        slug: store.slug,
+        name: store.name,
+        currency_code: store.currency_code,
+        timezone: store.timezone,
+        status: store.status,
     }
 }
 

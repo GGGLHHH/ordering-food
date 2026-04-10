@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use ordering_food_organization_application::{ApplicationError, BrandReadRepository, BrandRef};
+use ordering_food_organization_application::{
+    ApplicationError, BrandReadModel, BrandReadRepository,
+};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -21,7 +23,7 @@ impl SqlxBrandReadRepository {
 
 #[async_trait]
 impl BrandReadRepository for SqlxBrandReadRepository {
-    async fn get_by_id(&self, brand_id: &str) -> Result<Option<BrandRef>, ApplicationError> {
+    async fn get_by_id(&self, brand_id: &str) -> Result<Option<BrandReadModel>, ApplicationError> {
         let brand_id = Self::parse_brand_id(brand_id)?;
         let row = sqlx::query(
             r#"
@@ -38,7 +40,7 @@ impl BrandReadRepository for SqlxBrandReadRepository {
             ApplicationError::unexpected_with_source("failed to query organization brand", error)
         })?;
 
-        Ok(row.map(|row| BrandRef {
+        Ok(row.map(|row| BrandReadModel {
             brand_id: row.get::<Uuid, _>("id").to_string(),
         }))
     }

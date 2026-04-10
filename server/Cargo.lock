@@ -1582,7 +1582,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "ordering-food-organization-domain",
- "ordering-food-organization-published",
  "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "thiserror",
@@ -1607,7 +1606,6 @@ dependencies = [
  "ordering-food-database-infrastructure-sqlx",
  "ordering-food-organization-application",
  "ordering-food-organization-domain",
- "ordering-food-organization-published",
  "ordering-food-shared-kernel",
  "sqlx",
  "time",

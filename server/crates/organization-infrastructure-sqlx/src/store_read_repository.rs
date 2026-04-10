@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use ordering_food_organization_application::{ApplicationError, StoreReadRepository, StoreSummary};
+use ordering_food_organization_application::{
+    ApplicationError, StoreReadModel, StoreReadRepository,
+};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -21,7 +23,7 @@ impl SqlxStoreReadRepository {
 
 #[async_trait]
 impl StoreReadRepository for SqlxStoreReadRepository {
-    async fn get_active(&self) -> Result<Option<StoreSummary>, ApplicationError> {
+    async fn get_active(&self) -> Result<Option<StoreReadModel>, ApplicationError> {
         let row = sqlx::query(
             r#"
             SELECT
@@ -47,7 +49,7 @@ impl StoreReadRepository for SqlxStoreReadRepository {
             )
         })?;
 
-        Ok(row.map(|row| StoreSummary {
+        Ok(row.map(|row| StoreReadModel {
             store_id: row.get::<Uuid, _>("id").to_string(),
             brand_id: row.get::<Uuid, _>("brand_id").to_string(),
             slug: row.get("slug"),
@@ -61,7 +63,7 @@ impl StoreReadRepository for SqlxStoreReadRepository {
     async fn get_by_id(
         &self,
         store_id: &str,
-    ) -> Result<Option<StoreSummary>, ApplicationError> {
+    ) -> Result<Option<StoreReadModel>, ApplicationError> {
         let store_id = Self::parse_store_id(store_id)?;
         let row = sqlx::query(
             r#"
@@ -85,7 +87,7 @@ impl StoreReadRepository for SqlxStoreReadRepository {
             ApplicationError::unexpected_with_source("failed to query organization store", error)
         })?;
 
-        Ok(row.map(|row| StoreSummary {
+        Ok(row.map(|row| StoreReadModel {
             store_id: row.get::<Uuid, _>("id").to_string(),
             brand_id: row.get::<Uuid, _>("brand_id").to_string(),
             slug: row.get("slug"),

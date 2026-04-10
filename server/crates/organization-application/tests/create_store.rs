@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use ordering_food_organization_application::{
     ApplicationError, CreateBrand, CreateBrandInput, CreateStore, CreateStoreInput, IdGenerator,
-    OrganizationUnitOfWork, OrganizationUnitOfWorkFactory, StoreQueryService, StoreReadRepository,
+    OrganizationUnitOfWork, OrganizationUnitOfWorkFactory, StoreQueryService, StoreReadModel,
+    StoreReadRepository,
 };
 use ordering_food_organization_domain::{Brand, BrandId, Store, StoreId};
-use ordering_food_organization_published::StoreSummary;
 use ordering_food_shared_kernel::Timestamp;
 use std::{
     collections::HashMap,
@@ -178,7 +178,7 @@ async fn create_store_rolls_back_when_brand_lookup_fails() {
 
 #[tokio::test]
 async fn store_queries_return_active_store_summary() {
-    let summary = StoreSummary {
+    let summary = StoreReadModel {
         store_id: "store-1".to_string(),
         brand_id: "brand-1".to_string(),
         slug: "demo-kitchen".to_string(),
@@ -334,19 +334,19 @@ impl IdGenerator for FixedIdGenerator {
 }
 
 struct FakeStoreReadRepository {
-    active_store: Mutex<Option<StoreSummary>>,
+    active_store: Mutex<Option<StoreReadModel>>,
 }
 
 #[async_trait]
 impl StoreReadRepository for FakeStoreReadRepository {
-    async fn get_active(&self) -> Result<Option<StoreSummary>, ApplicationError> {
+    async fn get_active(&self) -> Result<Option<StoreReadModel>, ApplicationError> {
         Ok(self.active_store.lock().unwrap().clone())
     }
 
     async fn get_by_id(
         &self,
         store_id: &str,
-    ) -> Result<Option<StoreSummary>, ApplicationError> {
+    ) -> Result<Option<StoreReadModel>, ApplicationError> {
         Ok(self
             .active_store
             .lock()

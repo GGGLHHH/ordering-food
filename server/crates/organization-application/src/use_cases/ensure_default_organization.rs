@@ -360,7 +360,7 @@ mod tests {
     };
     use crate::{
         ApplicationError, Clock, IdGenerator, OrganizationUnitOfWork,
-        OrganizationUnitOfWorkFactory, StoreQueryService, StoreReadRepository, StoreSummary,
+        OrganizationUnitOfWorkFactory, StoreQueryService, StoreReadModel, StoreReadRepository,
     };
     use async_trait::async_trait;
     use ordering_food_organization_domain::{Brand, BrandId, OrganizationStatus, Store, StoreId};
@@ -533,7 +533,7 @@ mod tests {
 
     #[async_trait]
     impl StoreReadRepository for InMemoryOrganizationRepository {
-        async fn get_active(&self) -> Result<Option<StoreSummary>, ApplicationError> {
+        async fn get_active(&self) -> Result<Option<StoreReadModel>, ApplicationError> {
             Ok(self
                 .state
                 .lock()
@@ -544,7 +544,7 @@ mod tests {
                     store.status() == OrganizationStatus::Active && store.deleted_at().is_none()
                 })
                 .min_by_key(|store| store.created_at())
-                .map(|store| StoreSummary {
+                .map(|store| StoreReadModel {
                     store_id: store.id().as_str().to_string(),
                     brand_id: store.brand_id().as_str().to_string(),
                     slug: store.slug().to_string(),
@@ -558,14 +558,14 @@ mod tests {
         async fn get_by_id(
             &self,
             store_id: &str,
-        ) -> Result<Option<StoreSummary>, ApplicationError> {
+        ) -> Result<Option<StoreReadModel>, ApplicationError> {
             Ok(self
                 .state
                 .lock()
                 .unwrap()
                 .stores
                 .get(store_id)
-                .map(|store| StoreSummary {
+                .map(|store| StoreReadModel {
                     store_id: store.id().as_str().to_string(),
                     brand_id: store.brand_id().as_str().to_string(),
                     slug: store.slug().to_string(),

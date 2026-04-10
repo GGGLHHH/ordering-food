@@ -9,7 +9,6 @@ publish.workspace = true
 async-trait.workspace = true
 ordering-food-organization-application = { path = "../organization-application" }
 ordering-food-organization-domain = { path = "../organization-domain" }
-ordering-food-organization-published = { path = "../organization-published" }
 ordering-food-shared-kernel = { path = "../shared-kernel" }
 sqlx.workspace = true
 uuid.workspace = true

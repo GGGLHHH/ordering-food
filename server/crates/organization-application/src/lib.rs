@@ -65,7 +65,7 @@ impl From<DomainError> for ApplicationError {
     }
 }
 
-pub use dto::{BrandRef, StoreSummary};
+pub use dto::{BrandReadModel, StoreReadModel};
 pub use module::OrganizationModule;
 pub use ports::{
     BrandQueryService, BrandReadRepository, Clock, IdGenerator, OrganizationUnitOfWork,

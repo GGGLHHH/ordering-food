@@ -1,4 +1,4 @@
-use crate::{ApplicationError, BrandRef, StoreSummary};
+use crate::{ApplicationError, BrandReadModel, StoreReadModel};
 use async_trait::async_trait;
 use ordering_food_organization_domain::{Brand, BrandId, Store, StoreId};
 pub use ordering_food_platform_kernel::Clock;
@@ -39,14 +39,13 @@ pub trait OrganizationUnitOfWorkFactory: Send + Sync {
 
 #[async_trait]
 pub trait BrandReadRepository: Send + Sync {
-    async fn get_by_id(&self, brand_id: &str) -> Result<Option<BrandRef>, ApplicationError>;
+    async fn get_by_id(&self, brand_id: &str) -> Result<Option<BrandReadModel>, ApplicationError>;
 }
 
 #[async_trait]
 pub trait StoreReadRepository: Send + Sync {
-    async fn get_active(&self) -> Result<Option<StoreSummary>, ApplicationError>;
-    async fn get_by_id(&self, store_id: &str)
-    -> Result<Option<StoreSummary>, ApplicationError>;
+    async fn get_active(&self) -> Result<Option<StoreReadModel>, ApplicationError>;
+    async fn get_by_id(&self, store_id: &str) -> Result<Option<StoreReadModel>, ApplicationError>;
 }
 
 #[derive(Clone)]
@@ -62,7 +61,7 @@ impl BrandQueryService {
     pub async fn get_by_id(
         &self,
         brand_id: &str,
-    ) -> Result<Option<BrandRef>, ApplicationError> {
+    ) -> Result<Option<BrandReadModel>, ApplicationError> {
         self.repository.get_by_id(brand_id).await
     }
 }
@@ -77,14 +76,14 @@ impl StoreQueryService {
         Self { repository }
     }
 
-    pub async fn get_active(&self) -> Result<Option<StoreSummary>, ApplicationError> {
+    pub async fn get_active(&self) -> Result<Option<StoreReadModel>, ApplicationError> {
         self.repository.get_active().await
     }
 
     pub async fn get_by_id(
         &self,
         store_id: &str,
-    ) -> Result<Option<StoreSummary>, ApplicationError> {
+    ) -> Result<Option<StoreReadModel>, ApplicationError> {
         self.repository.get_by_id(store_id).await
     }
 }
