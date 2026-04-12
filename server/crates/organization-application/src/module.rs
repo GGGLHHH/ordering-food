@@ -38,7 +38,6 @@ impl OrganizationModule {
         Self {
             ensure_default_organization: Arc::new(EnsureDefaultOrganization::new(
                 unit_of_work_factory,
-                store_queries.clone(),
                 clock,
                 id_generator,
             )),

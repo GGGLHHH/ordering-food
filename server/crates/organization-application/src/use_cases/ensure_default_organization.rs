@@ -1,6 +1,5 @@
 use crate::{
     ApplicationError, Clock, IdGenerator, OrganizationUnitOfWork, OrganizationUnitOfWorkFactory,
-    StoreQueryService,
 };
 use ordering_food_organization_domain::{Brand, BrandId, OrganizationStatus, Store};
 use std::sync::Arc;
@@ -28,7 +27,6 @@ pub enum EnsureDefaultOrganizationOutcome {
 
 pub struct EnsureDefaultOrganization {
     unit_of_work_factory: Arc<dyn OrganizationUnitOfWorkFactory>,
-    store_queries: Arc<StoreQueryService>,
     clock: Arc<dyn Clock>,
     id_generator: Arc<dyn IdGenerator>,
 }
@@ -36,13 +34,11 @@ pub struct EnsureDefaultOrganization {
 impl EnsureDefaultOrganization {
     pub fn new(
         unit_of_work_factory: Arc<dyn OrganizationUnitOfWorkFactory>,
-        store_queries: Arc<StoreQueryService>,
         clock: Arc<dyn Clock>,
         id_generator: Arc<dyn IdGenerator>,
     ) -> Self {
         Self {
             unit_of_work_factory,
-            store_queries,
             clock,
             id_generator,
         }
@@ -52,10 +48,6 @@ impl EnsureDefaultOrganization {
         &self,
         input: EnsureDefaultOrganizationInput,
     ) -> Result<EnsureDefaultOrganizationOutcome, ApplicationError> {
-        if let Some(outcome) = self.current_active_store_outcome().await? {
-            return Ok(outcome);
-        }
-
         let brand_id = BrandId::new(input.brand_id.clone());
         let normalized_store_slug = Store::normalize_slug(&input.store_slug)?;
         let store_status = OrganizationStatus::parse(&input.store_status)?;
@@ -155,27 +147,12 @@ impl EnsureDefaultOrganization {
         }
     }
 
-    async fn current_active_store_outcome(
-        &self,
-    ) -> Result<Option<EnsureDefaultOrganizationOutcome>, ApplicationError> {
-        Ok(self.store_queries.get_active().await?.map(|store| {
-            EnsureDefaultOrganizationOutcome::Skipped {
-                store_id: store.store_id,
-                slug: store.slug,
-            }
-        }))
-    }
-
     async fn reconcile_after_conflict(
         &self,
         input: &EnsureDefaultOrganizationInput,
         brand_was_created: bool,
         error: ApplicationError,
     ) -> Result<EnsureDefaultOrganizationOutcome, ApplicationError> {
-        if let Some(outcome) = self.current_active_store_outcome().await? {
-            return Ok(outcome);
-        }
-
         let brand_id = BrandId::new(input.brand_id.clone());
         let normalized_store_slug = Store::normalize_slug(&input.store_slug)?;
         let mut unit_of_work = self.unit_of_work_factory.begin().await?;
@@ -274,10 +251,6 @@ impl EnsureDefaultOrganization {
         store_timezone: &str,
         error: ApplicationError,
     ) -> Result<EnsureDefaultOrganizationOutcome, ApplicationError> {
-        if let Some(outcome) = self.current_active_store_outcome().await? {
-            return Ok(outcome);
-        }
-
         let normalized_store_slug = Store::normalize_slug(store_slug)?;
         let mut unit_of_work = self.unit_of_work_factory.begin().await?;
         match self
@@ -360,7 +333,7 @@ mod tests {
     };
     use crate::{
         ApplicationError, Clock, IdGenerator, OrganizationUnitOfWork,
-        OrganizationUnitOfWorkFactory, StoreQueryService, StoreReadModel, StoreReadRepository,
+        OrganizationUnitOfWorkFactory, StoreReadModel, StoreReadRepository,
     };
     use async_trait::async_trait;
     use ordering_food_organization_domain::{Brand, BrandId, OrganizationStatus, Store, StoreId};
@@ -586,15 +559,9 @@ mod tests {
         });
         let clock = Arc::new(FakeClock);
         let id_generator = Arc::new(FixedIdGenerator::default());
-        let store_queries = Arc::new(StoreQueryService::new(repository.clone()));
 
         (
-            EnsureDefaultOrganization::new(
-                unit_of_work_factory.clone(),
-                store_queries,
-                clock,
-                id_generator,
-            ),
+            EnsureDefaultOrganization::new(unit_of_work_factory.clone(), clock, id_generator),
             unit_of_work_factory,
         )
     }
@@ -633,7 +600,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ensure_default_organization_skips_when_active_store_exists() {
+    async fn ensure_default_organization_skips_when_default_store_exists() {
         let repository = Arc::new(InMemoryOrganizationRepository::default());
         repository.state.lock().unwrap().brands.insert(
             DEFAULT_BRAND_ID.to_string(),
@@ -649,8 +616,8 @@ mod tests {
         let existing_store = Store::create(
             StoreId::new("store-existing"),
             BrandId::new(DEFAULT_BRAND_ID),
-            "existing-store",
-            "Existing Store",
+            "ordering-food-demo",
+            "Ordering Food Demo Kitchen",
             "CNY",
             "Asia/Shanghai",
             OrganizationStatus::Active,
@@ -665,11 +632,68 @@ mod tests {
             .insert(existing_store.id().as_str().to_string(), existing_store);
         let (use_case, _) = build_use_case(repository.clone());
 
-        use_case.execute(default_input()).await.unwrap();
+        let outcome = use_case.execute(default_input()).await.unwrap();
+
+        let state = repository.state.lock().unwrap();
+        assert!(matches!(
+            outcome,
+            EnsureDefaultOrganizationOutcome::Skipped { store_id, slug }
+            if store_id == "store-existing" && slug == "ordering-food-demo"
+        ));
+        assert_eq!(state.brands.len(), 1);
+        assert_eq!(state.stores.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn ensure_default_organization_creates_default_store_even_when_another_active_store_exists()
+     {
+        let repository = Arc::new(InMemoryOrganizationRepository::default());
+        repository.state.lock().unwrap().brands.insert(
+            DEFAULT_BRAND_ID.to_string(),
+            Brand::create(
+                BrandId::new(DEFAULT_BRAND_ID),
+                "ordering-food",
+                "Ordering Food",
+                OrganizationStatus::Active,
+                datetime!(2026-04-05 08:00 UTC),
+            )
+            .unwrap(),
+        );
+        let other_store = Store::create(
+            StoreId::new("store-other"),
+            BrandId::new(DEFAULT_BRAND_ID),
+            "other-store",
+            "Other Store",
+            "CNY",
+            "Asia/Shanghai",
+            OrganizationStatus::Active,
+            datetime!(2026-04-05 08:01 UTC),
+        )
+        .unwrap();
+        repository
+            .state
+            .lock()
+            .unwrap()
+            .stores
+            .insert(other_store.id().as_str().to_string(), other_store);
+        let (use_case, _) = build_use_case(repository.clone());
+
+        let outcome = use_case.execute(default_input()).await.unwrap();
+
+        assert!(matches!(
+            outcome,
+            EnsureDefaultOrganizationOutcome::CreatedStore { .. }
+        ));
 
         let state = repository.state.lock().unwrap();
         assert_eq!(state.brands.len(), 1);
-        assert_eq!(state.stores.len(), 1);
+        assert_eq!(state.stores.len(), 2);
+        assert!(
+            state
+                .stores
+                .values()
+                .any(|store| store.slug() == "ordering-food-demo")
+        );
     }
 
     #[tokio::test]

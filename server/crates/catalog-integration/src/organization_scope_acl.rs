@@ -23,17 +23,6 @@ impl CatalogOrganizationScopeAclAdapter {
             store_scope_gateway,
         }
     }
-
-    pub(crate) async fn require_active_store_scope(
-        store_scope_gateway: &dyn StoreScopeGateway,
-    ) -> Result<CatalogStoreScope, CatalogApplicationError> {
-        store_scope_gateway
-            .get_active()
-            .await
-            .map_err(map_organization_error)?
-            .map(map_store_summary)
-            .ok_or_else(|| CatalogApplicationError::not_found("organization store was not found"))
-    }
 }
 
 #[async_trait]

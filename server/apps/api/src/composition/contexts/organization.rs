@@ -5,9 +5,7 @@ use crate::composition::{
     platform::ApiPlatform,
 };
 use ordering_food_bootstrap_core::{BootstrapRegistration, ContextDescriptor};
-use ordering_food_organization_integration::{
-    build_organization_context_runtime, seed_default_organization,
-};
+use ordering_food_organization_integration::build_organization_context_runtime;
 
 pub fn register_organization() -> ApiContextRegistration {
     let descriptor = ContextDescriptor {
@@ -36,9 +34,6 @@ fn organization_bootstrap_registration(
                 ORGANIZATION_BRAND_LOOKUP_GATEWAY,
                 runtime.brand_lookup_gateway().clone(),
             );
-            let _seed_outcome = seed_default_organization(&runtime)
-                .await
-                .map_err(|error| std::io::Error::other(error.to_string()))?;
 
             let mut contribution = ApiContextContribution::empty(context_id);
             contribution.add_readiness_check(ApiNamedReadinessCheck::always_ok(

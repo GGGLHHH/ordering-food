@@ -1262,6 +1262,7 @@ dependencies = [
  "ordering-food-access-domain",
  "ordering-food-access-integration",
  "ordering-food-access-published",
+ "ordering-food-app-support",
  "ordering-food-bootstrap-core",
  "ordering-food-catalog-application",
  "ordering-food-catalog-integration",
@@ -1297,6 +1298,39 @@ dependencies = [
  "tracing-subscriber",
  "utoipa",
  "utoipa-swagger-ui",
+ "uuid",
+]
+
+[[package]]
+name = "ordering-food-app-support"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "config",
+ "ordering-food-platform-kernel",
+ "ordering-food-shared-kernel",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-error",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ordering-food-bootstrap"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dotenvy",
+ "ordering-food-app-support",
+ "ordering-food-catalog-integration",
+ "ordering-food-database-infrastructure-sqlx",
+ "ordering-food-organization-integration",
+ "ordering-food-platform-kernel",
+ "sqlx",
+ "time",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -1413,20 +1447,20 @@ dependencies = [
 [[package]]
 name = "ordering-food-fulfillment-integration"
 version = "0.1.0"
+dependencies = [
  "async-trait",
  "ordering-food-access-published",
-dependencies = [
  "ordering-food-database-infrastructure-sqlx",
  "ordering-food-fulfillment-application",
  "ordering-food-fulfillment-infrastructure-sqlx",
  "ordering-food-ordering-published",
- "ordering-food-shared-kernel",
  "ordering-food-platform-kernel",
+ "ordering-food-shared-kernel",
  "serde_json",
  "sqlx",
  "thiserror",
- "tokio",
  "time",
+ "tokio",
  "uuid",
 ]
 
@@ -1551,18 +1585,18 @@ dependencies = [
 [[package]]
 name = "ordering-food-ordering-integration"
 version = "0.1.0"
- "async-trait",
 dependencies = [
+ "async-trait",
  "ordering-food-ordering-application",
  "ordering-food-ordering-domain",
- "ordering-food-ordering-published",
  "ordering-food-ordering-infrastructure-sqlx",
+ "ordering-food-ordering-published",
+ "ordering-food-platform-kernel",
  "ordering-food-shared-kernel",
  "serde",
  "serde_json",
- "ordering-food-platform-kernel",
- "time",
  "sqlx",
+ "time",
  "uuid",
 ]
 
@@ -1571,8 +1605,8 @@ name = "ordering-food-ordering-published"
 version = "0.1.0"
 dependencies = [
  "ordering-food-shared-kernel",
- "serde_json",
  "serde",
+ "serde_json",
  "time",
 ]
 

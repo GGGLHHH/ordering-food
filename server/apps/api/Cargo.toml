@@ -19,6 +19,7 @@ async-trait.workspace = true
 axum.workspace = true
 config.workspace = true
 dotenvy.workspace = true
+ordering-food-app-support = { path = "../../crates/app-support" }
 ordering-food-access-application = { path = "../../crates/access-application" }
 ordering-food-access-integration = { path = "../../crates/access-integration" }
 ordering-food-access-published = { path = "../../crates/access-published" }

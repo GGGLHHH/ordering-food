@@ -53,10 +53,14 @@ fn catalog_context_makes_seed_explicit_after_runtime_build() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("src/composition/contexts/catalog.rs"),
     )
     .unwrap();
+    let bootstrap_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/bootstrap/src/lib.rs"),
+    )
+    .unwrap();
 
     assert!(context_source.contains("ordering_food_catalog_integration"));
     assert!(context_source.contains("build_catalog_context_runtime"));
-    assert!(context_source.contains("seed_default_catalog"));
+    assert!(!context_source.contains("seed_default_catalog"));
     assert!(!context_source.contains("build_seeded_catalog_sqlx_module"));
     assert!(!context_source.contains("ordering_food_catalog_infrastructure_sqlx"));
 
@@ -73,6 +77,9 @@ fn catalog_context_makes_seed_explicit_after_runtime_build() {
             "catalog context must not retain bootstrap orchestration detail {forbidden}"
         );
     }
+
+    assert!(bootstrap_source.contains("seed_default_catalog"));
+    assert!(bootstrap_source.contains("build_catalog_context_runtime"));
 }
 
 #[test]

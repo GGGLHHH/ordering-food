@@ -1,9 +1,11 @@
 [workspace]
 members = [
     "apps/api",
+    "apps/bootstrap",
     "crates/database-infrastructure-sqlx",
     "crates/shared-kernel",
     "crates/platform-kernel",
+    "crates/app-support",
     "crates/identity-domain",
     "crates/identity-application",
     "crates/identity-infrastructure-sqlx",

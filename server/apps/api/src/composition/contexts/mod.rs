@@ -8,6 +8,9 @@ mod organization;
 
 use crate::composition::context_registration::ApiContextRegistration;
 
+#[cfg(test)]
+mod bootstrap_tests;
+
 pub fn registrations() -> Vec<ApiContextRegistration> {
     vec![
         database::register_database(),

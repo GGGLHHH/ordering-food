@@ -69,7 +69,7 @@ pub async fn seed_default_organization(
             info!(
                 store_id = %store_id,
                 slug = %slug,
-                "organization seed skipped because an active store already exists"
+                "organization seed skipped because the default store already exists"
             );
         }
         EnsureDefaultOrganizationOutcome::CreatedStore { store_id, brand_id } => {
@@ -96,6 +96,28 @@ pub async fn seed_default_organization(
     }
 
     Ok(outcome)
+}
+
+pub async fn resolve_seeded_store_scope(
+    runtime: &OrganizationContextRuntime,
+    outcome: &EnsureDefaultOrganizationOutcome,
+) -> Result<StoreSummary, OrganizationApplicationError> {
+    let store_id = match outcome {
+        EnsureDefaultOrganizationOutcome::Skipped { store_id, .. }
+        | EnsureDefaultOrganizationOutcome::CreatedStore { store_id, .. }
+        | EnsureDefaultOrganizationOutcome::CreatedBrandAndStore { store_id, .. }
+        | EnsureDefaultOrganizationOutcome::RecoveredStore { store_id, .. } => store_id,
+    };
+
+    runtime
+        .module
+        .store_queries()
+        .get_by_id(store_id)
+        .await?
+        .map(map_store_summary)
+        .ok_or_else(|| {
+            OrganizationApplicationError::not_found("seeded organization store was not found")
+        })
 }
 
 struct SqlxStoreScopeGateway {

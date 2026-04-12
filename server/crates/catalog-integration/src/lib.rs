@@ -3,12 +3,12 @@ mod organization_scope_acl;
 use ordering_food_catalog_application::{
     ApplicationError as CatalogApplicationError, BootstrapDefaultCatalogInput,
     BootstrapDefaultCatalogOutcome, BootstrapDefaultCategoryInput, BootstrapDefaultItemInput,
-    CatalogModule, Clock as CatalogClock, IdGenerator as CatalogIdGenerator,
+    CatalogModule, CatalogStoreScope, Clock as CatalogClock, IdGenerator as CatalogIdGenerator,
 };
 use ordering_food_catalog_domain::{BrandCatalogId, CategoryId, ItemId, StoreCatalogId};
 use ordering_food_catalog_infrastructure_sqlx::build_catalog_sqlx_module;
+use ordering_food_organization_published::{BrandLookupGateway, StoreScopeGateway, StoreSummary};
 use organization_scope_acl::CatalogOrganizationScopeAclAdapter;
-use ordering_food_organization_published::{BrandLookupGateway, StoreScopeGateway};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -53,14 +53,19 @@ pub fn build_catalog_context_runtime(
 
 pub async fn seed_default_catalog(
     runtime: &CatalogContextRuntime,
-    store_scope_gateway: Arc<dyn StoreScopeGateway>,
+    active_store: StoreSummary,
     bootstrap: CatalogBootstrap,
 ) -> Result<BootstrapDefaultCatalogOutcome, CatalogApplicationError> {
-    let active_store =
-        CatalogOrganizationScopeAclAdapter::require_active_store_scope(store_scope_gateway.as_ref())
-            .await?;
     let input = BootstrapDefaultCatalogInput {
-        active_store,
+        active_store: CatalogStoreScope {
+            store_id: active_store.store_id,
+            brand_id: active_store.brand_id,
+            slug: active_store.slug,
+            name: active_store.name,
+            currency_code: active_store.currency_code,
+            timezone: active_store.timezone,
+            status: active_store.status,
+        },
         brand_slug: bootstrap.brand_slug,
         brand_name: bootstrap.brand_name,
         categories: default_categories(),

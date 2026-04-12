@@ -36,10 +36,14 @@ fn organization_context_makes_default_seed_explicit_after_build() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("src/composition/contexts/organization.rs"),
     )
     .unwrap();
+    let bootstrap_source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/bootstrap/src/lib.rs"),
+    )
+    .unwrap();
 
     assert!(organization_source.contains("ordering_food_organization_integration"));
     assert!(organization_source.contains("build_organization_context_runtime"));
-    assert!(organization_source.contains("seed_default_organization"));
+    assert!(!organization_source.contains("seed_default_organization"));
     assert!(!organization_source.contains("build_bootstrapped_organization_module"));
     assert!(!organization_source.contains("ordering_food_organization_infrastructure_sqlx"));
     assert!(!organization_source.contains("ordering_food_organization_application"));
@@ -53,6 +57,8 @@ fn organization_context_makes_default_seed_explicit_after_build() {
     assert!(organization_source.contains("ORGANIZATION_STORE_SCOPE_GATEWAY"));
     assert!(organization_source.contains("ORGANIZATION_BRAND_LOOKUP_GATEWAY"));
     assert!(organization_source.contains(".publish("));
+    assert!(bootstrap_source.contains("seed_default_organization"));
+    assert!(bootstrap_source.contains("build_organization_context_runtime"));
 }
 
 #[test]
