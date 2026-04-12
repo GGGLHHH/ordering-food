@@ -22,6 +22,10 @@ fn default_brand_id() -> BrandId {
     BrandId::new("00000000-0000-4000-8000-000000000001")
 }
 
+fn default_brand_uuid() -> Uuid {
+    Uuid::parse_str(default_brand_id().as_str()).unwrap()
+}
+
 fn make_store(store_id: Uuid, created_at: Timestamp) -> Store {
     Store::create(
         StoreId::new(store_id.to_string()),
@@ -54,7 +58,32 @@ async fn insert_brand(pool: &PgPool, brand: &Brand) {
     unit_of_work.commit().await.unwrap();
 }
 
+async fn ensure_default_brand(pool: &PgPool) {
+    sqlx::query(
+        r#"
+        INSERT INTO organization.brands (
+            id,
+            slug,
+            name,
+            status,
+            created_at,
+            updated_at,
+            deleted_at
+        )
+        VALUES ($1, 'ordering-food', 'Ordering Food', 'active', $2, $2, NULL)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(default_brand_uuid())
+    .bind(fixed_timestamp(1_700_000_000))
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
 async fn insert_store(pool: &PgPool, store: &Store) {
+    ensure_default_brand(pool).await;
+
     let unit_of_work_factory = SqlxOrganizationUnitOfWorkFactory::new(pool.clone());
     let mut unit_of_work = unit_of_work_factory.begin().await.unwrap();
     unit_of_work.insert_store(store).await.unwrap();
@@ -79,6 +108,21 @@ async fn organization_migration_creates_schema_tables(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "MIGRATOR")]
+async fn organization_migration_does_not_seed_default_business_data(pool: PgPool) {
+    let brand_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM organization.brands")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let store_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM organization.stores")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(brand_count, 0);
+    assert_eq!(store_count, 0);
+}
+
+#[sqlx::test(migrator = "MIGRATOR")]
 async fn sqlx_unit_of_work_inserts_and_loads_brand(pool: PgPool) {
     let brand = Brand::create(
         BrandId::new(unique_uuid().to_string()),
@@ -99,6 +143,8 @@ async fn sqlx_unit_of_work_inserts_and_loads_brand(pool: PgPool) {
 #[sqlx::test(migrator = "MIGRATOR")]
 async fn sqlx_unit_of_work_inserts_and_loads_store_by_brand_slug(pool: PgPool) {
     let store = make_store(unique_uuid(), fixed_timestamp(1_700_000_100));
+    ensure_default_brand(&pool).await;
+
     let unit_of_work_factory = SqlxOrganizationUnitOfWorkFactory::new(pool);
     let mut unit_of_work = unit_of_work_factory.begin().await.unwrap();
     unit_of_work.insert_store(&store).await.unwrap();
@@ -172,10 +218,7 @@ async fn sqlx_brand_read_repository_skips_deleted_brand(pool: PgPool) {
     .unwrap();
 
     let repository = SqlxBrandReadRepository::new(pool);
-    let brand = repository
-        .get_by_id(&brand_id.to_string())
-        .await
-        .unwrap();
+    let brand = repository.get_by_id(&brand_id.to_string()).await.unwrap();
 
     assert!(brand.is_none());
 }
@@ -224,10 +267,7 @@ async fn get_by_id_skips_deleted_store(pool: PgPool) {
     .unwrap();
 
     let repository = SqlxStoreReadRepository::new(pool);
-    let store = repository
-        .get_by_id(&store_id.to_string())
-        .await
-        .unwrap();
+    let store = repository.get_by_id(&store_id.to_string()).await.unwrap();
 
     assert!(store.is_none());
 }

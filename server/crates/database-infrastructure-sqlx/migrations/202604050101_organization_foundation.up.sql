@@ -25,6 +25,7 @@ CREATE TABLE organization.stores (
     CONSTRAINT organization_stores_brand_slug_unique UNIQUE (brand_id, slug)
 );
 
+-- Preserve legacy menu stores by attaching them to a synthetic migration brand.
 INSERT INTO organization.brands (
     id,
     slug,
@@ -34,15 +35,16 @@ INSERT INTO organization.brands (
     updated_at,
     deleted_at
 )
-VALUES (
-    '00000000-0000-4000-8000-000000000001',
-    'ordering-food',
-    'Ordering Food',
+SELECT
+    '00000000-0000-4000-8000-000000000002'::UUID,
+    'legacy-menu-import',
+    'Legacy Menu Import',
     'active',
-    NOW(),
-    NOW(),
+    MIN(created_at),
+    MAX(updated_at),
     NULL
-)
+FROM menu.stores
+HAVING COUNT(*) > 0
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO organization.stores (
@@ -59,7 +61,7 @@ INSERT INTO organization.stores (
 )
 SELECT
     id,
-    '00000000-0000-4000-8000-000000000001'::UUID,
+    '00000000-0000-4000-8000-000000000002'::UUID,
     slug,
     name,
     currency_code,
