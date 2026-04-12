@@ -80,6 +80,19 @@ fn workspace_members_include_access_infrastructure_and_exclude_authz_members() {
 }
 
 #[test]
+fn workspace_members_include_bootstrap_app_and_shell_support_crate() {
+    let manifest =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml")).unwrap();
+
+    for member in ["apps/bootstrap", "crates/app-support"] {
+        assert!(
+            manifest.contains(member),
+            "missing workspace member: {member}"
+        );
+    }
+}
+
+#[test]
 fn historical_authz_migrations_remain_in_place() {
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../crates/database-infrastructure-sqlx/migrations");

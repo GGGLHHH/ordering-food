@@ -29,9 +29,7 @@ fn ordering_published_exposes_event_language_instead_of_temporary_sync_gateways(
 
 #[test]
 fn target_architecture_doc_requires_phase_3_event_and_projection_path() {
-    let source = read_source(
-        "../../../docs/superpowers/specs/2026-04-09-server-ddd-purity-remediation-design.md",
-    );
+    let source = read_source("../../ARCHITECTURE.md");
 
     assert!(source.contains("长期目标态整改"));
     assert!(source.contains("integration runner 拉取 outbox 消息"));

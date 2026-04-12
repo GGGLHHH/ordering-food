@@ -2,11 +2,19 @@
 
 Rust backend API scaffold for the `server` workspace, now organized as a strict DDD modular monolith.
 
+## Backend architecture constitution
+
+The backend target architecture is documented in `server/ARCHITECTURE.md`.
+Any backend change that alters layer boundaries, cross-context collaboration, or composition rules
+should keep that document and the related architecture tests in sync.
+
 ## Workspace layout
 
 `server` is the Cargo workspace root and currently contains these bounded-context and platform crates:
 
-- `apps/api`: the only HTTP entrypoint, responsible for Axum startup, routing, OpenAPI, config, and app-specific composition
+- `apps/api`: the only HTTP entrypoint, responsible for Axum startup, routing, OpenAPI, and HTTP-side composition
+- `apps/bootstrap`: explicit default-data bootstrap entrypoint, used only for opt-in seed execution
+- `crates/app-support`: shared outer-layer config, observability, and runtime support for backend apps
 - `crates/bootstrap-core`: shared runtime registry kernel for context descriptors, topology planning, migrations, and bootstrap ordering
 - `crates/database-infrastructure-sqlx`: the single source of truth for SQLx migrations across all contexts
 - `crates/shared-kernel`: minimal cross-context primitives only
@@ -105,6 +113,13 @@ make dev
 ```
 
 The Bacon configuration lives in `server/bacon.toml` and watches both `apps/` and `crates/`.
+
+The API does not seed `organization` or `catalog` data on startup by default.
+If you need temporary local bootstrap data, run the explicit bootstrap command:
+
+```bash
+cd server && cargo run -p ordering-food-bootstrap
+```
 
 ## Run the full containerized stack
 
